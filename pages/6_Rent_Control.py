@@ -38,8 +38,8 @@ st.set_page_config(
 # -------------------------
 st.title("Rent Control Analysis")
 st.caption(
-    "This page explores the relationship between property prices and rent control zones in Paris in 2025. "
-    "Each property is assigned to a zone using a spatial point-in-polygon join."
+    "This page dives deeper into the relationship between property transaction data and rent controls in Paris in 2025. "
+    "The ***quartiers*** of Paris are assigned to one of the city's 14 rent control zones. Properties are located within one of these zones using a spatial point-in-polygon join."
 )
 
 
@@ -171,7 +171,7 @@ st.markdown("---")
 # -------------------------
 
 st.header("Is reference rent higher for properties with more rooms?")
-st.caption("Contrary to our expecations, median reference rent is highest for 1-room properties, and decreases as room count increases.")
+st.caption("Contrary to our expecations, median reference rent is **highest for 1-room properties**, and decreases as room count increases.")
 
 
 # group rent_raw by room count, calculating median reference rent
