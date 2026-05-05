@@ -1,95 +1,45 @@
 import streamlit as st
-
 import folium
-
 from streamlit_folium import st_folium
-
 import pandas as pd
-
 import geopandas as gpd
-
 import numpy as np
-
 import json
-
 import os
-
 from pathlib import Path
-
 from shapely.geometry import shape
-
 from shapely.wkt import loads as wkt_loads
-
 import branca.colormap as cm
-
 import matplotlib.pyplot as plt
-
 import matplotlib.colors as mcolors
-
 from matplotlib.colorbar import ColorbarBase
-
-from data_loader import load_dvf, load_rent, load_planned
+from data_loader import load_dvf, load_rent, load_green, load_planned
 
 st.set_page_config(
-
     page_title="Analysis",
-
+    page_icon="📊",
     layout="wide",
-
 )
 
-#  Load data
-
-PROJECT_DIR = Path(__file__).resolve().parent.parent
-
-DATA_DIR = PROJECT_DIR / "data"
-
-dvf_raw = load_dvf()
-
+#  Load data 
+dvf_raw  = load_dvf()
 rent_raw = load_rent()
-
-green_raw = pd.read_csv(DATA_DIR / "green_spaces.csv")
-
+green_raw = load_green()
 plan_raw = load_planned()
 
 n_ok = (dvf_raw["data_quality_flag"] == "ok").sum()
 
-#  Sidebar controls (defined early so room_count is available for KPIs)
-with st.sidebar:
-    st.markdown("## Map Controls")
-    st.markdown("---")
-    st.markdown("### Reference Rent")
-    room_label = st.radio(
-        "Number of rooms",
-        options=["1 room", "2 rooms", "3 rooms", "4 rooms +"],
-        index=1,
-        label_visibility="collapsed"
-    )
-    room_map   = {"1 room": 1, "2 rooms": 2, "3 rooms": 3, "4 rooms +": 4}
-    room_count = room_map[room_label]
-
-    st.markdown("---")
-    st.markdown("### Layers")
-    show_dvf     = st.checkbox("Sale price (€/m²)",     value=True)
-    show_rent    = st.checkbox("Reference rent",          value=True)
-    show_green   = st.checkbox("Existing green spaces",  value=False)
-    show_planned = st.checkbox("Planned green spaces",   value=False)
-
-    st.markdown("---")
-    st.caption("DVF 2025 · Rent control data · Open Data Paris")
-
-#  Header
+#  Header 
 st.title("Analysis")
 st.markdown("Interactive map of sale prices, rent-control zones, and green spaces · Paris 2025")
 st.markdown("---")
 
-#  KPIs — reference rent reacts to room filter
-dvf_clean    = dvf_raw[dvf_raw["data_quality_flag"] == "ok"]
-avg_ref_rent = rent_raw[rent_raw["room_count"] == room_count]["reference_rent"].mean()
+#  KPIs 
+dvf_clean = dvf_raw[dvf_raw["data_quality_flag"] == "ok"]
 col1, col2, col3, col4 = st.columns(4)
 col1.metric("Clean Transactions", f"{n_ok:,}")
 col2.metric("Median Price / m²", f"€{dvf_clean['price_per_sqm'].median():,.0f}")
-col3.metric(f"Avg. Reference Rent ({room_label})", f"€{avg_ref_rent:.1f} /m²")
+col3.metric("Avg. Reference Rent (2-room)", f"€{rent_raw[rent_raw['room_count']==2]['reference_rent'].mean():.1f} /m²")
 col4.metric("Green Spaces", f"{len(green_raw):,}")
 
 st.markdown("---")
@@ -131,7 +81,11 @@ def build_green_gdf(_green_df):
     geoms, idx_keep = [], []
     for idx, row in filtered.iterrows():
         try:
-            geoms.append(wkt_loads(str(row["geometry"])))
+            geo = json.loads(row["geo_shape"])
+            if geo.get("type") == "Feature":
+                geoms.append(shape(geo["geometry"]))
+            else:
+                geoms.append(shape(geo))
             idx_keep.append(idx)
         except Exception:
             pass
@@ -145,6 +99,30 @@ def build_green_gdf(_green_df):
 q_gdf     = build_quartier_gdf(rent_raw)
 dvf_gdf   = compute_dvf_stats(dvf_raw, q_gdf)
 green_gdf = build_green_gdf(green_raw)
+
+#  Sidebar controls 
+with st.sidebar:
+    st.markdown("## Map Controls")
+    st.markdown("---")
+    st.markdown("### Reference Rent")
+    room_label = st.radio(
+        "Number of rooms",
+        options=["1 room", "2 rooms", "3 rooms", "4 rooms +"],
+        index=1,
+        label_visibility="collapsed"
+    )
+    room_map   = {"1 room": 1, "2 rooms": 2, "3 rooms": 3, "4 rooms +": 4}
+    room_count = room_map[room_label]
+
+    st.markdown("---")
+    st.markdown("### Layers")
+    show_dvf     = st.checkbox("Sale price (€/m²)",     value=True)
+    show_rent    = st.checkbox("Reference rent",          value=True)
+    show_green   = st.checkbox("Existing green spaces",  value=False)
+    show_planned = st.checkbox("Planned green spaces",   value=False)
+
+    st.markdown("---")
+    st.caption("DVF 2025 · Rent control data · Open Data Paris")
 
 #  Map build 
 TOOLTIP_STYLE = (
@@ -184,8 +162,7 @@ def build_map():
         location=[48.8566, 2.3522],
         zoom_start=12,
         tiles="CartoDB positron",
-        zoom_control=True,
-        scrollWheelZoom=False
+        zoom_control=True
     )
 
     valid    = dvf_gdf[dvf_gdf["median_price"].notna()]
@@ -402,8 +379,8 @@ st.markdown(f"""
 **Data notes**
 
 **Sale price layer:** Based on {n_ok:,} apartment transactions from the DVF dataset, Paris 2025.
-{n_flagged:,} records were excluded based on data quality flags: price_per_sqm_high (n=537),
-surface_too_small (n=196), high_room_count (n=98).
+{n_flagged:,} records were excluded based on data quality flags: `price_per_sqm_high` (n=537),
+`surface_too_small` (n=196), `high_room_count` (n=98).
 Each quartier shows the **median** price per m² to limit the influence of outliers.
 
 **Reference rent layer:** Based on the Paris rent-control framework (*encadrement des loyers*), 2025 edition.
@@ -413,302 +390,3 @@ Min and max values represent the legal lower and upper bounds around the referen
 **Green spaces:** Source: Open Data Paris. Existing spaces filtered to polygon area > 500 m².
 Planned spaces represent projects with a confirmed completion date.
 """)
-
-# ── Transaction Search ────────────────────────────────────────────────────────
-st.markdown("---")
-st.subheader("Transaction Search")
-st.markdown(
-    "Use the filters first to narrow down the transaction list. "
-    "Then search within the filtered results or select a transaction from the dropdown."
-)
-
-# Work only with DVF records that are useful for selection.
-# Keep flagged rows visible, but remove rows without a basic identifier/address.
-transaction_df = dvf_raw.copy()
-
-# Add a robust arrondissement column for filtering.
-# Prefer an existing arrondissement column. Otherwise derive it from postal_code if available.
-if "arrondissement" not in transaction_df.columns:
-    if "postal_code" in transaction_df.columns:
-        transaction_df["arrondissement"] = (
-            transaction_df["postal_code"]
-            .astype(str)
-            .str.extract(r"(75\d{3})")[0]
-            .str[-2:]
-        )
-        transaction_df["arrondissement"] = pd.to_numeric(
-            transaction_df["arrondissement"], errors="coerce"
-        )
-    else:
-        transaction_df["arrondissement"] = np.nan
-
-# Add date helper columns for filtering and stable ordering.
-if "transaction_date" in transaction_df.columns:
-    transaction_df["transaction_date_sort"] = pd.to_datetime(
-        transaction_df["transaction_date"], errors="coerce"
-    )
-    transaction_df["transaction_month"] = transaction_df["transaction_date_sort"].dt.month
-    transaction_df["transaction_month_label"] = transaction_df["transaction_date_sort"].dt.strftime("%B")
-
-# labels for internal data-quality flags.
-quality_label_map = {
-    "ok": "Clean records only",
-    "price_per_sqm_high": "Flagged: unusually high price per m²",
-    "surface_too_small": "Flagged: unusually small surface area",
-    "high_room_count": "Flagged: unusually high room count",
-}
-
-def format_quality_label(flag):
-    return quality_label_map.get(str(flag), str(flag).replace("_", " ").title())
-
-# Property type to prevent apartments, houses, outbuildings, and commercial records from being mixed in one long list.
-filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
-
-with filter_col1:
-    arr_values = sorted(
-        transaction_df["arrondissement"].dropna().astype(int).unique().tolist()
-    )
-    selected_arrondissement = st.selectbox(
-        "Arrondissement",
-        options=["All"] + arr_values,
-        format_func=lambda x: "All arrondissements" if x == "All" else f"{int(x)}{['th','st','nd','rd','th'][min(int(x) % 10, 4)]} arrondissement",
-    )
-
-with filter_col2:
-    property_values = sorted(
-        transaction_df["property_type"].dropna().astype(str).unique().tolist()
-    ) if "property_type" in transaction_df.columns else []
-    selected_property_type = st.selectbox(
-        "Property type",
-        options=["All"] + property_values,
-        format_func=lambda x: "All property types" if x == "All" else x,
-        help="Use this to focus the transaction list on apartments, houses, outbuildings, or commercial records.",
-    )
-
-with filter_col3:
-    quality_values = [
-        flag for flag in ["ok", "price_per_sqm_high", "surface_too_small", "high_room_count"]
-        if flag in transaction_df["data_quality_flag"].dropna().unique().tolist()
-    ]
-    extra_quality_values = sorted(
-        [flag for flag in transaction_df["data_quality_flag"].dropna().unique().tolist() if flag not in quality_values]
-    )
-    selected_quality = st.selectbox(
-        "Data quality",
-        options=["All"] + quality_values + extra_quality_values,
-        index=1 if "ok" in quality_values else 0,
-        format_func=lambda x: "All records" if x == "All" else format_quality_label(x),
-        help="Clean records passed the basic quality checks. Flagged records are kept available for review but are excluded from the map layer.",
-    )
-
-with filter_col4:
-    if "transaction_month" in transaction_df.columns:
-        month_lookup = (
-            transaction_df[["transaction_month", "transaction_month_label"]]
-            .dropna()
-            .drop_duplicates()
-            .sort_values("transaction_month")
-        )
-        month_options = ["All"] + month_lookup["transaction_month"].astype(int).tolist()
-        month_label_map = dict(
-            zip(month_lookup["transaction_month"].astype(int), month_lookup["transaction_month_label"])
-        )
-    else:
-        month_options = ["All"]
-        month_label_map = {}
-
-    selected_month = st.selectbox(
-        "Transaction month",
-        options=month_options,
-        format_func=lambda x: "All months" if x == "All" else month_label_map.get(int(x), str(x)),
-        help="Filter transactions to a specific month in 2025.",
-    )
-
-filtered_transactions = transaction_df.copy()
-
-if selected_arrondissement != "All":
-    filtered_transactions = filtered_transactions[
-        filtered_transactions["arrondissement"] == int(selected_arrondissement)
-    ]
-
-if selected_property_type != "All" and "property_type" in filtered_transactions.columns:
-    filtered_transactions = filtered_transactions[
-        filtered_transactions["property_type"].astype(str) == selected_property_type
-    ]
-
-if selected_quality != "All":
-    filtered_transactions = filtered_transactions[
-        filtered_transactions["data_quality_flag"] == selected_quality
-    ]
-
-if selected_month != "All" and "transaction_month" in filtered_transactions.columns:
-    filtered_transactions = filtered_transactions[
-        filtered_transactions["transaction_month"] == int(selected_month)
-    ]
-
-search_query = st.text_input(
-    "Search within filtered transactions",
-    placeholder="Street, address, transaction key, date, or property type",
-)
-
-if search_query and len(search_query.strip()) >= 2:
-    q = search_query.strip().upper()
-    searchable_cols = [
-        c for c in [
-            "address",
-            "transaction_key",
-            "transaction_date",
-            "property_type",
-            "postal_code",
-        ]
-        if c in filtered_transactions.columns
-    ]
-
-    if searchable_cols:
-        mask = pd.Series(False, index=filtered_transactions.index)
-        for col in searchable_cols:
-            mask = mask | filtered_transactions[col].fillna("").astype(str).str.upper().str.contains(q, regex=False)
-        filtered_transactions = filtered_transactions[mask]
-
-# Sort the underlying filtered results before showing/selecting them.
-filtered_transactions = filtered_transactions.copy()
-if "transaction_date_sort" in filtered_transactions.columns:
-    filtered_transactions = filtered_transactions.sort_values(
-        "transaction_date_sort", ascending=False, na_position="last"
-    )
-
-st.caption(f"{len(filtered_transactions):,} matching transaction(s)")
-
-# Add a cleaner user-facing quality label for tables and details.
-if "data_quality_flag" in filtered_transactions.columns:
-    filtered_transactions["data_quality"] = filtered_transactions["data_quality_flag"].apply(format_quality_label)
-
-# Show preview table
-preview_cols = [
-    c for c in [
-        "transaction_date",
-        "address",
-        "arrondissement",
-        "property_type",
-        "surface_area",
-        "room_count",
-        "property_value",
-        "price_per_sqm",
-        "data_quality",
-        "transaction_key",
-    ]
-    if c in filtered_transactions.columns
-]
-
-if filtered_transactions.empty:
-    st.info("No transactions found. Try changing the filters or using a broader search term.")
-else:
-    # Keep the preview lightweight and user-friendly. For larger result sets, users
-    # should filter/search rather than loading thousands of rows into the preview.
-    row_options = [25, 50, 100, 250, 500, 1000]
-    row_options = [n for n in row_options if n <= len(filtered_transactions)]
-    if len(filtered_transactions) not in row_options and len(filtered_transactions) < 25:
-        row_options.append(len(filtered_transactions))
-
-    preview_limit = st.selectbox(
-        "Rows shown in preview",
-        options=row_options,
-        index=min(2, len(row_options) - 1),  # Default to 100 rows when available
-        help="Choose how many rows to display. Use the filters or search box to narrow larger result sets.",
-    )
-
-    preview = filtered_transactions[preview_cols].head(preview_limit).copy()
-    st.dataframe(preview, use_container_width=True, hide_index=True)
-
-    # Create dropdown labels
-    selection_limit = min(500, len(filtered_transactions))
-    selection_df = filtered_transactions.head(selection_limit).copy()
-
-    def format_transaction_option(idx):
-        row = selection_df.loc[idx]
-        address = row.get("address", "Unknown address")
-        date = row.get("transaction_date", "—")
-        price = row.get("price_per_sqm", np.nan)
-        rooms = row.get("room_count", np.nan)
-        price_txt = f"€{price:,.0f}/m²" if pd.notna(price) else "no €/m²"
-        rooms_txt = f"{int(rooms)} room(s)" if pd.notna(rooms) else "rooms unknown"
-        return f"{address} · {date} · {rooms_txt} · {price_txt}"
-
-    selected_idx = st.selectbox(
-        "Select a transaction",
-        options=selection_df.index.tolist(),
-        format_func=format_transaction_option,
-        help="",
-    )
-
-    selected_row = selection_df.loc[selected_idx]
-
-    # Spatial join to get quarter_id for the selected result.
-    selected_with_quarter = selected_row.copy()
-    if pd.notna(selected_row.get("lon")) and pd.notna(selected_row.get("lat")):
-        selected_gdf = gpd.GeoDataFrame(
-            pd.DataFrame([selected_row]),
-            geometry=gpd.points_from_xy([selected_row["lon"]], [selected_row["lat"]]),
-            crs="EPSG:4326",
-        )
-        joined = gpd.sjoin(
-            selected_gdf[["transaction_key", "geometry"]],
-            q_gdf[["quarter_id", "quarter_name", "geometry"]],
-            how="left",
-            predicate="within",
-        )
-        if not joined.empty:
-            selected_with_quarter["quarter_id"] = joined.iloc[0].get("quarter_id")
-            selected_with_quarter["quarter_name"] = joined.iloc[0].get("quarter_name")
-
-    rent_lookup = rent_raw[rent_raw["room_count"] == room_count].set_index("quarter_id")[
-        ["reference_rent", "min_rent", "max_rent", "quarter_name"]
-    ]
-
-    flag = selected_with_quarter.get("data_quality_flag", "ok")
-    flag_color = "#dc2626" if flag != "ok" else "#16a34a"
-    qid = selected_with_quarter.get("quarter_id")
-    rent_row = rent_lookup.loc[qid] if (pd.notna(qid) and qid in rent_lookup.index) else None
-
-    st.markdown("### Selected Transaction")
-    col_l, col_r = st.columns(2)
-
-    with col_l:
-        st.markdown("**Transaction Details**")
-        st.markdown(f"""
-| Field | Value |
-|---|---|
-| Transaction Key | {selected_with_quarter.get('transaction_key', '—')} |
-| Date | {selected_with_quarter.get('transaction_date', '—')} |
-| Address | {selected_with_quarter.get('address', '—')} |
-| Arrondissement | {int(selected_with_quarter.get('arrondissement')) if pd.notna(selected_with_quarter.get('arrondissement')) else '—'} |
-| Property Type | {selected_with_quarter.get('property_type', '—')} |
-| Surface Area | {f"{selected_with_quarter['surface_area']:.1f} m²" if pd.notna(selected_with_quarter.get('surface_area')) else '—'} |
-| Rooms | {int(selected_with_quarter['room_count']) if pd.notna(selected_with_quarter.get('room_count')) else '—'} |
-| Property Value | {f"€{selected_with_quarter['property_value']:,.0f}" if pd.notna(selected_with_quarter.get('property_value')) else '—'} |
-| Price / m² | {f"€{selected_with_quarter['price_per_sqm']:,.0f}" if pd.notna(selected_with_quarter.get('price_per_sqm')) else '—'} |
-| Data Quality | <span style='color:{flag_color}'>{format_quality_label(flag)}</span> |
-        """, unsafe_allow_html=True)
-
-    with col_r:
-        st.markdown(f"**Rent Control: {room_label}**")
-        if rent_row is not None:
-            quarter_name = selected_with_quarter.get("quarter_name", rent_row.get("quarter_name", "—"))
-            ref = rent_row["reference_rent"]
-            rmin = rent_row["min_rent"]
-            rmax = rent_row["max_rent"]
-            st.markdown(f"""
-| Field | Value |
-|---|---|
-| Quarter | {quarter_name} |
-| Min rent | €{rmin:.1f} /m² |
-| Reference rent | €{ref:.1f} /m² |
-| Max rent | €{rmax:.1f} /m² |
-            """)
-            if pd.notna(selected_with_quarter.get("surface_area")):
-                st.markdown(
-                    f"*Implied monthly rent at reference: "
-                    f"**€{ref * selected_with_quarter['surface_area']:.0f}/month***"
-                )
-        else:
-            st.info("No rent-control data available for this location.")
