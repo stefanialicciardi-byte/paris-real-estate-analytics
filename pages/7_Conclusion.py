@@ -62,7 +62,7 @@ with r1c1:
         <br>
         <p> 🛠  The main weakness of our ETL pipeline is the manual uploads involved at multiple steps in the pipeline. 
         
-        <p> ✅  To ensure consistency, there are checkpoints along the way were necessary data uploads are flagged.
+        <p> ✅  To ensure consistency, there are checkpoints along the way where necessary data uploads are flagged.
         
         <p> 💡  Looking forward, one solution would be to integrate the entire pipeline into Snowflake (which was not possible with a trial account).
         </span>
