@@ -1,1701 +1,688 @@
 import streamlit as st
-
 import folium
-
 from streamlit_folium import st_folium
-
 import pandas as pd
-
 import geopandas as gpd
-
 import numpy as np
-
 import json
-
 import os
-
 from pathlib import Path
-
 from shapely.geometry import shape
-
 from shapely.wkt import loads as wkt_loads
-
 import branca.colormap as cm
-
 import matplotlib.pyplot as plt
-
 import matplotlib.colors as mcolors
-
 from matplotlib.colorbar import ColorbarBase
-
-from data_loader import load_dvf, load_rent, load_planned
-
-# ── Page setup ────────────────────────────────────────────────────────────────
+from data_loader import load_dvf, load_rent, load_green, load_planned
 
 st.set_page_config(
-
     page_title="Analysis",
-
     layout="wide",
-
 )
 
-# ── Load data ─────────────────────────────────────────────────────────────────
-
-DATA_DIR = Path(os.getenv("DATA_DIR", Path(__file__).parent))
-
-dvf_raw = load_dvf()
-
+#  Load data 
+dvf_raw  = load_dvf()
 rent_raw = load_rent()
-
-# Important:
-
-# Green spaces are loaded directly from CSV because the old working code did this.
-
-# load_green() appears to alter the structure/geometry in a way that breaks the map layer.
-
-green_raw = pd.read_csv(DATA_DIR / "green_spaces.csv")
-
+green_raw = load_green()
 plan_raw = load_planned()
 
 n_ok = (dvf_raw["data_quality_flag"] == "ok").sum()
 
-# ── Sidebar controls ──────────────────────────────────────────────────────────
-
+#  Sidebar controls (defined early so room_count is available for KPIs)
 with st.sidebar:
-
     st.markdown("## Map Controls")
-
     st.markdown("---")
-
     st.markdown("### Reference Rent")
-
     room_label = st.radio(
-
         "Number of rooms",
-
         options=["1 room", "2 rooms", "3 rooms", "4 rooms +"],
-
         index=1,
-
-        label_visibility="collapsed",
-
+        label_visibility="collapsed"
     )
-
-    room_map = {
-
-        "1 room": 1,
-
-        "2 rooms": 2,
-
-        "3 rooms": 3,
-
-        "4 rooms +": 4,
-
-    }
-
+    room_map   = {"1 room": 1, "2 rooms": 2, "3 rooms": 3, "4 rooms +": 4}
     room_count = room_map[room_label]
 
     st.markdown("---")
-
     st.markdown("### Layers")
-
-    show_dvf = st.checkbox("Sale price (€/m²)", value=True)
-
-    show_rent = st.checkbox("Reference rent", value=True)
-
-    show_green = st.checkbox("Existing green spaces", value=False)
-
-    show_planned = st.checkbox("Planned green spaces", value=False)
+    show_dvf     = st.checkbox("Sale price (€/m²)",     value=True)
+    show_rent    = st.checkbox("Reference rent",          value=True)
+    show_green   = st.checkbox("Existing green spaces",  value=False)
+    show_planned = st.checkbox("Planned green spaces",   value=False)
 
     st.markdown("---")
-
     st.caption("DVF 2025 · Rent control data · Open Data Paris")
 
-# ── Header ────────────────────────────────────────────────────────────────────
-
+#  Header
 st.title("Analysis")
-
 st.markdown("Interactive map of sale prices, rent-control zones, and green spaces · Paris 2025")
-
 st.markdown("---")
 
-# ── KPIs ──────────────────────────────────────────────────────────────────────
-
-dvf_clean = dvf_raw[dvf_raw["data_quality_flag"] == "ok"]
-
+#  KPIs — reference rent reacts to room filter
+dvf_clean    = dvf_raw[dvf_raw["data_quality_flag"] == "ok"]
 avg_ref_rent = rent_raw[rent_raw["room_count"] == room_count]["reference_rent"].mean()
-
 col1, col2, col3, col4 = st.columns(4)
-
 col1.metric("Clean Transactions", f"{n_ok:,}")
-
 col2.metric("Median Price / m²", f"€{dvf_clean['price_per_sqm'].median():,.0f}")
-
 col3.metric(f"Avg. Reference Rent ({room_label})", f"€{avg_ref_rent:.1f} /m²")
-
 col4.metric("Green Spaces", f"{len(green_raw):,}")
 
 st.markdown("---")
 
-# ── Map helpers ───────────────────────────────────────────────────────────────
-
+#  Map helpers 
 @st.cache_data
-
 def build_quartier_gdf(_rent_df):
-
     unique_q = _rent_df.drop_duplicates("quarter_id")[
-
         ["quarter_id", "quarter_name", "postal_code", "geo_shape"]
-
     ].copy()
-
-    geoms = [
-
-        shape(json.loads(r["geo_shape"])["geometry"])
-
-        for _, r in unique_q.iterrows()
-
-    ]
-
-    gdf = gpd.GeoDataFrame(
-
-        unique_q,
-
-        geometry=geoms,
-
-        crs="EPSG:4326",
-
-    )
-
+    geoms = [shape(json.loads(r["geo_shape"])["geometry"]) for _, r in unique_q.iterrows()]
+    gdf = gpd.GeoDataFrame(unique_q, geometry=geoms, crs="EPSG:4326")
     gdf["arrondissement"] = gdf["postal_code"].astype(str).str[-2:].astype(int)
-
     return gdf
 
 @st.cache_data
-
 def compute_dvf_stats(_dvf_df, _q_gdf):
-
     dvf_clean = _dvf_df[
-
-        (_dvf_df["price_per_sqm"].notna())
-
-        & (_dvf_df["lon"].notna())
-
-        & (_dvf_df["lat"].notna())
-
-        & (_dvf_df["data_quality_flag"] == "ok")
-
+        (_dvf_df["price_per_sqm"].notna()) &
+        (_dvf_df["lon"].notna()) &
+        (_dvf_df["data_quality_flag"] == "ok")
     ].copy()
-
     dvf_pts = gpd.GeoDataFrame(
-
         dvf_clean,
-
         geometry=gpd.points_from_xy(dvf_clean.lon, dvf_clean.lat),
-
-        crs="EPSG:4326",
-
+        crs="EPSG:4326"
     )
-
-    joined = gpd.sjoin(
-
-        dvf_pts,
-
-        _q_gdf[["quarter_id", "geometry"]],
-
-        how="left",
-
-        predicate="within",
-
-    )
-
+    joined = gpd.sjoin(dvf_pts, _q_gdf[["quarter_id", "geometry"]], how="left", predicate="within")
     stats = (
-
         joined.groupby("quarter_id")
-
-        .agg(
-
-            median_price=("price_per_sqm", "median"),
-
-            n_tx=("price_per_sqm", "count"),
-
-        )
-
+        .agg(median_price=("price_per_sqm", "median"), n_tx=("price_per_sqm", "count"))
         .reset_index()
-
     )
-
     return _q_gdf.merge(stats, on="quarter_id", how="left")
 
 @st.cache_data
-
 def build_green_gdf(_green_df):
-
-    # This is the old working green-space logic.
-
     filtered = _green_df[_green_df["polygon_area"] > 500].copy()
-
     geoms, idx_keep = [], []
-
     for idx, row in filtered.iterrows():
-
         try:
-
             geoms.append(wkt_loads(str(row["geometry"])))
-
             idx_keep.append(idx)
-
         except Exception:
-
             pass
-
     filtered = filtered.loc[idx_keep].copy().reset_index(drop=True)
-
     filtered["_geom"] = geoms
-
-    gdf = gpd.GeoDataFrame(
-
-        filtered,
-
-        geometry="_geom",
-
-        crs="EPSG:4326",
-
-    )
-
+    gdf = gpd.GeoDataFrame(filtered, geometry="_geom", crs="EPSG:4326")
     max_a = gdf["polygon_area"].max()
-
-    gdf["opacity"] = (
-
-        0.25 + 0.55 * (gdf["polygon_area"] / max_a)
-
-    ).clip(0.25, 0.8)
-
+    gdf["opacity"] = (0.25 + 0.55 * (gdf["polygon_area"] / max_a)).clip(0.25, 0.8)
     return gdf
 
-q_gdf = build_quartier_gdf(rent_raw)
-
-dvf_gdf = compute_dvf_stats(dvf_raw, q_gdf)
-
+q_gdf     = build_quartier_gdf(rent_raw)
+dvf_gdf   = compute_dvf_stats(dvf_raw, q_gdf)
 green_gdf = build_green_gdf(green_raw)
 
-# ── Map build helpers ─────────────────────────────────────────────────────────
-
+#  Map build 
 TOOLTIP_STYLE = (
-
     "background-color: white;"
-
     "border: 1px solid #ccc;"
-
     "border-radius: 4px;"
-
     "font-family: sans-serif;"
-
     "font-size: 13px;"
-
     "padding: 6px 10px;"
-
 )
 
 def draw_colorbar(hex_colors, vmin, vmax, label):
-
     fig, ax = plt.subplots(figsize=(4, 0.45))
-
     fig.patch.set_facecolor("white")
-
     fig.subplots_adjust(bottom=0.55)
-
     cmap = mcolors.LinearSegmentedColormap.from_list("custom", hex_colors)
-
     norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
-
-    cb = ColorbarBase(
-
-        ax,
-
-        cmap=cmap,
-
-        norm=norm,
-
-        orientation="horizontal",
-
-    )
-
+    cb   = ColorbarBase(ax, cmap=cmap, norm=norm, orientation="horizontal")
     cb.set_label(label, fontsize=9, color="#444", labelpad=4)
-
     cb.ax.tick_params(labelsize=8, colors="#444")
-
     cb.outline.set_visible(False)
-
     return fig
 
 def ordinal(n):
-
     n = int(n)
-
     if 11 <= (n % 100) <= 13:
-
         return f"{n}th"
-
-    return f"{n}{['th', 'st', 'nd', 'rd', 'th'][min(n % 10, 4)]}"
+    return f"{n}{['th','st','nd','rd','th'][min(n % 10, 4)]}"
 
 def feat(geometry, props):
-
-    return {
-
-        "type": "FeatureCollection",
-
-        "features": [
-
-            {
-
-                "type": "Feature",
-
-                "geometry": geometry,
-
-                "properties": props,
-
-            }
-
-        ],
-
-    }
+    return {"type": "FeatureCollection", "features": [
+        {"type": "Feature", "geometry": geometry, "properties": props}
+    ]}
 
 def build_map():
-
     m = folium.Map(
-
         location=[48.8566, 2.3522],
-
         zoom_start=12,
-
         tiles="CartoDB positron",
-
         zoom_control=True,
-
-        scrollWheelZoom=False,
-
+        scrollWheelZoom=False
     )
 
-    valid = dvf_gdf[dvf_gdf["median_price"].notna()]
-
+    valid    = dvf_gdf[dvf_gdf["median_price"].notna()]
     dvf_vmin = valid["median_price"].quantile(0.05)
-
     dvf_vmax = valid["median_price"].quantile(0.95)
-
     dvf_cmap = cm.LinearColormap(
-
         colors=["#FFF176", "#FF9800", "#D32F2F"],
-
-        vmin=dvf_vmin,
-
-        vmax=dvf_vmax,
-
-        caption="Sale price (€/m²)",
-
+        vmin=dvf_vmin, vmax=dvf_vmax, caption="Sale price (€/m²)"
     )
 
-    rent_sel = rent_raw[rent_raw["room_count"] == room_count]
-
+    rent_sel  = rent_raw[rent_raw["room_count"] == room_count]
     rent_cmap = cm.LinearColormap(
-
         colors=["#E3F2FD", "#1565C0"],
-
         vmin=rent_sel["reference_rent"].min(),
-
         vmax=rent_sel["reference_rent"].max(),
-
-        caption=f"Reference rent {room_label} (€/m²)",
-
+        caption=f"Reference rent {room_label} (€/m²)"
     )
-
-    # Sale price + reference rent
 
     if show_dvf and show_rent:
-
         dvf_layer = folium.FeatureGroup(name="Sale price (€/m²)", show=True)
-
         for _, row in dvf_gdf.iterrows():
-
             if pd.isna(row["median_price"]):
-
                 continue
-
-            color = dvf_cmap(
-
-                max(dvf_vmin, min(dvf_vmax, row["median_price"]))
-
-            )
-
+            color = dvf_cmap(max(dvf_vmin, min(dvf_vmax, row["median_price"])))
             folium.GeoJson(
-
                 row["geometry"].__geo_interface__,
-
                 style_function=lambda x, c=color: {
-
-                    "fillColor": c,
-
-                    "color": "#ffffff",
-
-                    "weight": 0.4,
-
-                    "fillOpacity": 0.7,
-
-                },
-
+                    "fillColor": c, "color": "#ffffff", "weight": 0.4, "fillOpacity": 0.7
+                }
             ).add_to(dvf_layer)
-
         dvf_layer.add_to(m)
 
         rent_layer = folium.FeatureGroup(name="Reference rent", show=True)
-
         for _, row in rent_sel.iterrows():
-
             try:
-
                 geojson = json.loads(row["geo_shape"])
-
-                color = rent_cmap(row["reference_rent"])
-
+                color   = rent_cmap(row["reference_rent"])
                 arr_num = str(row["postal_code"])[-2:].lstrip("0") or "1"
-
-                qid = row["quarter_id"]
-
+                qid     = row["quarter_id"]
                 dvf_row = dvf_gdf[dvf_gdf["quarter_id"] == qid]
-
                 if not dvf_row.empty and pd.notna(dvf_row.iloc[0]["median_price"]):
-
                     d = dvf_row.iloc[0]
-
-                    props = {
-
-                        "Quarter": row["quarter_name"],
-
+                    props   = {
+                        "Quarter":        row["quarter_name"],
                         "Arrondissement": ordinal(arr_num),
-
-                        "Median price": f"{d['median_price']:,.0f} €/m²",
-
-                        "Transactions": str(int(d["n_tx"]))
-
-                        if pd.notna(d.get("n_tx"))
-
-                        else "—",
-
-                        "Min rent": f"{row['min_rent']} €/m²",
-
+                        "Median price":   f"{d['median_price']:,.0f} €/m²",
+                        "Transactions":   str(int(d["n_tx"])) if pd.notna(d.get("n_tx")) else "—",
+                        "Min rent":       f"{row['min_rent']} €/m²",
                         "Reference rent": f"{row['reference_rent']} €/m²",
-
-                        "Max rent": f"{row['max_rent']} €/m²",
-
+                        "Max rent":       f"{row['max_rent']} €/m²",
                     }
-
-                    fields = [
-
-                        "Quarter",
-
-                        "Arrondissement",
-
-                        "Median price",
-
-                        "Transactions",
-
-                        "Min rent",
-
-                        "Reference rent",
-
-                        "Max rent",
-
-                    ]
-
-                    aliases = [
-
-                        "Quarter:",
-
-                        "Arrondissement:",
-
-                        "Median price:",
-
-                        "Transactions:",
-
-                        "Min rent:",
-
-                        "Reference rent:",
-
-                        "Max rent:",
-
-                    ]
-
+                    fields  = ["Quarter","Arrondissement","Median price","Transactions",
+                               "Min rent","Reference rent","Max rent"]
+                    aliases = ["Quarter:","Arrondissement:","Median price:","Transactions:",
+                               "Min rent:","Reference rent:","Max rent:"]
                 else:
-
-                    props = {
-
-                        "Quarter": row["quarter_name"],
-
+                    props   = {
+                        "Quarter":        row["quarter_name"],
                         "Arrondissement": ordinal(arr_num),
-
-                        "Min rent": f"{row['min_rent']} €/m²",
-
+                        "Min rent":       f"{row['min_rent']} €/m²",
                         "Reference rent": f"{row['reference_rent']} €/m²",
-
-                        "Max rent": f"{row['max_rent']} €/m²",
-
+                        "Max rent":       f"{row['max_rent']} €/m²",
                     }
-
-                    fields = [
-
-                        "Quarter",
-
-                        "Arrondissement",
-
-                        "Min rent",
-
-                        "Reference rent",
-
-                        "Max rent",
-
-                    ]
-
-                    aliases = [
-
-                        "Quarter:",
-
-                        "Arrondissement:",
-
-                        "Min rent:",
-
-                        "Reference rent:",
-
-                        "Max rent:",
-
-                    ]
-
+                    fields  = ["Quarter","Arrondissement","Min rent","Reference rent","Max rent"]
+                    aliases = ["Quarter:","Arrondissement:","Min rent:","Reference rent:","Max rent:"]
                 folium.GeoJson(
-
                     feat(geojson["geometry"], props),
-
                     style_function=lambda x, c=color: {
-
-                        "fillColor": c,
-
-                        "color": "#90CAF9",
-
-                        "weight": 0.7,
-
-                        "fillOpacity": 0.45,
-
+                        "fillColor": c, "color": "#90CAF9", "weight": 0.7, "fillOpacity": 0.45
                     },
-
                     tooltip=folium.GeoJsonTooltip(
-
-                        fields=fields,
-
-                        aliases=aliases,
-
-                        style=TOOLTIP_STYLE,
-
-                        sticky=True,
-
-                    ),
-
+                        fields=fields, aliases=aliases,
+                        style=TOOLTIP_STYLE, sticky=True
+                    )
                 ).add_to(rent_layer)
-
             except Exception:
-
                 pass
-
         rent_layer.add_to(m)
 
-    # Sale price only
-
     elif show_dvf:
-
         layer = folium.FeatureGroup(name="Sale price (€/m²)", show=True)
-
         for _, row in dvf_gdf.iterrows():
-
             if pd.isna(row["median_price"]):
-
                 continue
-
-            color = dvf_cmap(
-
-                max(dvf_vmin, min(dvf_vmax, row["median_price"]))
-
-            )
-
+            color = dvf_cmap(max(dvf_vmin, min(dvf_vmax, row["median_price"])))
             folium.GeoJson(
-
-                feat(
-
-                    row["geometry"].__geo_interface__,
-
-                    {
-
-                        "Quarter": row["quarter_name"],
-
-                        "Arrondissement": ordinal(row["arrondissement"]),
-
-                        "Median price": f"{row['median_price']:,.0f} €/m²",
-
-                        "Transactions": str(int(row["n_tx"]))
-
-                        if pd.notna(row.get("n_tx"))
-
-                        else "—",
-
-                    },
-
-                ),
-
+                feat(row["geometry"].__geo_interface__, {
+                    "Quarter":        row["quarter_name"],
+                    "Arrondissement": ordinal(row["arrondissement"]),
+                    "Median price":   f"{row['median_price']:,.0f} €/m²",
+                    "Transactions":   str(int(row["n_tx"])) if pd.notna(row.get("n_tx")) else "—",
+                }),
                 style_function=lambda x, c=color: {
-
-                    "fillColor": c,
-
-                    "color": "#ffffff",
-
-                    "weight": 0.4,
-
-                    "fillOpacity": 0.7,
-
+                    "fillColor": c, "color": "#ffffff", "weight": 0.4, "fillOpacity": 0.7
                 },
-
                 tooltip=folium.GeoJsonTooltip(
-
-                    fields=[
-
-                        "Quarter",
-
-                        "Arrondissement",
-
-                        "Median price",
-
-                        "Transactions",
-
-                    ],
-
-                    aliases=[
-
-                        "Quarter:",
-
-                        "Arrondissement:",
-
-                        "Median price:",
-
-                        "Transactions:",
-
-                    ],
-
-                    style=TOOLTIP_STYLE,
-
-                    sticky=True,
-
-                ),
-
+                    fields=["Quarter","Arrondissement","Median price","Transactions"],
+                    aliases=["Quarter:","Arrondissement:","Median price:","Transactions:"],
+                    style=TOOLTIP_STYLE, sticky=True
+                )
             ).add_to(layer)
-
         layer.add_to(m)
-
-    # Reference rent only
 
     elif show_rent:
-
         layer = folium.FeatureGroup(name="Reference rent", show=True)
-
         for _, row in rent_sel.iterrows():
-
             try:
-
                 geojson = json.loads(row["geo_shape"])
-
-                color = rent_cmap(row["reference_rent"])
-
+                color   = rent_cmap(row["reference_rent"])
                 arr_num = str(row["postal_code"])[-2:].lstrip("0") or "1"
-
                 folium.GeoJson(
-
-                    feat(
-
-                        geojson["geometry"],
-
-                        {
-
-                            "Quarter": row["quarter_name"],
-
-                            "Arrondissement": ordinal(arr_num),
-
-                            "Min rent": f"{row['min_rent']} €/m²",
-
-                            "Reference rent": f"{row['reference_rent']} €/m²",
-
-                            "Max rent": f"{row['max_rent']} €/m²",
-
-                        },
-
-                    ),
-
+                    feat(geojson["geometry"], {
+                        "Quarter":        row["quarter_name"],
+                        "Arrondissement": ordinal(arr_num),
+                        "Min rent":       f"{row['min_rent']} €/m²",
+                        "Reference rent": f"{row['reference_rent']} €/m²",
+                        "Max rent":       f"{row['max_rent']} €/m²",
+                    }),
                     style_function=lambda x, c=color: {
-
-                        "fillColor": c,
-
-                        "color": "#90CAF9",
-
-                        "weight": 0.7,
-
-                        "fillOpacity": 0.55,
-
+                        "fillColor": c, "color": "#90CAF9", "weight": 0.7, "fillOpacity": 0.55
                     },
-
                     tooltip=folium.GeoJsonTooltip(
-
-                        fields=[
-
-                            "Quarter",
-
-                            "Arrondissement",
-
-                            "Min rent",
-
-                            "Reference rent",
-
-                            "Max rent",
-
-                        ],
-
-                        aliases=[
-
-                            "Quarter:",
-
-                            "Arrondissement:",
-
-                            "Min rent:",
-
-                            "Reference rent:",
-
-                            "Max rent:",
-
-                        ],
-
-                        style=TOOLTIP_STYLE,
-
-                        sticky=True,
-
-                    ),
-
+                        fields=["Quarter","Arrondissement","Min rent","Reference rent","Max rent"],
+                        aliases=["Quarter:","Arrondissement:","Min rent:","Reference rent:","Max rent:"],
+                        style=TOOLTIP_STYLE, sticky=True
+                    )
                 ).add_to(layer)
-
             except Exception:
-
                 pass
-
         layer.add_to(m)
-
-    # Existing green spaces
-
-    # This is the old working layer logic.
 
     if show_green:
-
         layer = folium.FeatureGroup(name="Existing green spaces", show=True)
-
         for _, row in green_gdf.iterrows():
-
             try:
-
-                area_str = (
-
-                    f"{row['polygon_area']:,.0f} m²"
-
-                    if pd.notna(row["polygon_area"])
-
-                    else "—"
-
-                )
-
+                area_str = f"{row['polygon_area']:,.0f} m²" if pd.notna(row["polygon_area"]) else "—"
                 folium.GeoJson(
-
-                    feat(
-
-                        row["_geom"].__geo_interface__,
-
-                        {
-
-                            "Name": row["green_space_name"],
-
-                            "Type": row["green_space_type"],
-
-                            "Area": area_str,
-
-                        },
-
-                    ),
-
+                    feat(row["_geom"].__geo_interface__, {
+                        "Name": row["green_space_name"],
+                        "Type": row["green_space_type"],
+                        "Area": area_str,
+                    }),
                     style_function=lambda x, op=float(row["opacity"]): {
-
-                        "fillColor": "#4CAF50",
-
-                        "color": "#2E7D32",
-
-                        "weight": 0.5,
-
-                        "fillOpacity": op,
-
+                        "fillColor": "#4CAF50", "color": "#2E7D32",
+                        "weight": 0.5, "fillOpacity": op
                     },
-
                     tooltip=folium.GeoJsonTooltip(
-
-                        fields=["Name", "Type", "Area"],
-
-                        aliases=["Name:", "Type:", "Area:"],
-
-                        style=TOOLTIP_STYLE,
-
-                        sticky=True,
-
-                    ),
-
+                        fields=["Name","Type","Area"],
+                        aliases=["Name:","Type:","Area:"],
+                        style=TOOLTIP_STYLE, sticky=True
+                    )
                 ).add_to(layer)
-
             except Exception:
-
                 pass
-
         layer.add_to(m)
 
-    # Planned green spaces
-
     if show_planned:
-
         layer = folium.FeatureGroup(name="Planned green spaces", show=True)
-
         for _, row in plan_raw.iterrows():
-
             if pd.isna(row["latitude"]) or pd.isna(row["longitude"]):
-
                 continue
-
-            area_str = (
-
-                f"{row['added_space_indicator']:,.0f} m²"
-
-                if pd.notna(row["added_space_indicator"])
-
-                and row["added_space_indicator"] > 0
-
-                else "—"
-
-            )
-
-            completion_label = (
-
-                "Completed:"
-
-                if int(row["completion_date"]) <= 2025
-
-                else "Est. completion:"
-
-            )
-
+            area_str = f"{row['added_space_indicator']:,.0f} m²" if pd.notna(row["added_space_indicator"]) and row["added_space_indicator"] > 0 else "—"
             folium.CircleMarker(
-
                 location=[row["latitude"], row["longitude"]],
-
                 radius=7,
-
                 color="#1B5E20",
-
                 weight=2,
-
                 fill=True,
-
                 fill_color="#66BB6A",
-
                 fill_opacity=0.9,
-
                 tooltip=folium.Tooltip(
-
                     f"<div style='{TOOLTIP_STYLE}'>"
-
                     f"<b>{row['project_name']}</b><br>"
-
-                    f"<span style='color:#555'>Arrondissement:</span> "
-
-                    f"{ordinal(row['arrondissement'])}<br>"
-
-                    f"<span style='color:#555'>New green area:</span> "
-
-                    f"{area_str}<br>"
-
-                    f"<span style='color:#555'>{completion_label}</span> "
-
-                    f"{row['completion_date']}"
-
+                    f"<span style='color:#555'>Arrondissement:</span> {ordinal(row['arrondissement'])}<br>"
+                    f"<span style='color:#555'>New green area:</span> {area_str}<br>"
+                    f"<span style='color:#555'>{'Completed:' if int(row['completion_date']) <= 2025 else 'Est. completion:'}</span> {row['completion_date']}"
                     f"</div>",
-
-                    sticky=True,
-
-                ),
-
+                    sticky=True
+                )
             ).add_to(layer)
-
         layer.add_to(m)
 
     return m
 
-# ── Colorbars ─────────────────────────────────────────────────────────────────
-
+#  Colorbars 
 if show_dvf or show_rent:
-
-    valid = dvf_gdf[dvf_gdf["median_price"].notna()]
-
+    valid    = dvf_gdf[dvf_gdf["median_price"].notna()]
     dvf_vmin = valid["median_price"].quantile(0.05)
-
     dvf_vmax = valid["median_price"].quantile(0.95)
-
     rent_sel = rent_raw[rent_raw["room_count"] == room_count]
-
     cb_left, cb_right = st.columns(2)
-
     with cb_left:
-
         if show_dvf:
-
-            fig = draw_colorbar(
-
-                ["#FFF176", "#FF9800", "#D32F2F"],
-
-                dvf_vmin,
-
-                dvf_vmax,
-
-                "Sale price (€/m²)",
-
-            )
-
+            fig = draw_colorbar(["#FFF176","#FF9800","#D32F2F"], dvf_vmin, dvf_vmax, "Sale price (€/m²)")
             st.pyplot(fig, use_container_width=True)
-
             plt.close(fig)
-
     with cb_right:
-
         if show_rent:
-
-            fig = draw_colorbar(
-
-                ["#E3F2FD", "#1565C0"],
-
-                rent_sel["reference_rent"].min(),
-
-                rent_sel["reference_rent"].max(),
-
-                f"Reference rent {room_label} (€/m²)",
-
-            )
-
+            fig = draw_colorbar(["#E3F2FD","#1565C0"],
+                                rent_sel["reference_rent"].min(),
+                                rent_sel["reference_rent"].max(),
+                                f"Reference rent {room_label} (€/m²)")
             st.pyplot(fig, use_container_width=True)
-
             plt.close(fig)
 
-# ── Map ───────────────────────────────────────────────────────────────────────
-
+#  Map 
 m = build_map()
-
 st_folium(m, width="100%", height=700, returned_objects=[])
 
-# ── Data notes ────────────────────────────────────────────────────────────────
-
+#  Data notes 
 n_flagged = (dvf_raw["data_quality_flag"] != "ok").sum()
-
 st.markdown("---")
-
-st.markdown(
-
-    f"""
-
+st.markdown(f"""
 **Data notes**
 
 **Sale price layer:** Based on {n_ok:,} apartment transactions from the DVF dataset, Paris 2025.
-
-{n_flagged:,} records were excluded based on data quality flags: `price_per_sqm_high` (n=537),
-
-`surface_too_small` (n=196), `high_room_count` (n=98).
-
+{n_flagged:,} records were excluded based on data quality flags: price_per_sqm_high (n=537),
+surface_too_small (n=196), high_room_count (n=98).
 Each quartier shows the **median** price per m² to limit the influence of outliers.
 
 **Reference rent layer:** Based on the Paris rent-control framework (*encadrement des loyers*), 2025 edition.
-
 Rents are expressed in €/m² of living space and vary by quartier and number of rooms.
-
 Min and max values represent the legal lower and upper bounds around the reference rent.
 
 **Green spaces:** Source: Open Data Paris. Existing spaces filtered to polygon area > 500 m².
-
 Planned spaces represent projects with a confirmed completion date.
-
-"""
-
-)
+""")
 
 # ── Transaction Search ────────────────────────────────────────────────────────
-
 st.markdown("---")
-
 st.subheader("Transaction Search")
-
 st.markdown(
-
     "Use the filters first to narrow down the transaction list. "
-
     "Then search within the filtered results or select a transaction from the dropdown."
-
 )
 
+# Work only with DVF records that are useful for selection.
+# Keep flagged rows visible, but remove rows without a basic identifier/address.
 transaction_df = dvf_raw.copy()
 
 # Add a robust arrondissement column for filtering.
-
 # Prefer an existing arrondissement column. Otherwise derive it from postal_code if available.
-
 if "arrondissement" not in transaction_df.columns:
-
     if "postal_code" in transaction_df.columns:
-
         transaction_df["arrondissement"] = (
-
             transaction_df["postal_code"]
-
             .astype(str)
-
             .str.extract(r"(75\d{3})")[0]
-
             .str[-2:]
-
         )
-
         transaction_df["arrondissement"] = pd.to_numeric(
-
-            transaction_df["arrondissement"],
-
-            errors="coerce",
-
+            transaction_df["arrondissement"], errors="coerce"
         )
-
     else:
-
         transaction_df["arrondissement"] = np.nan
 
 # Add date helper columns for filtering and stable ordering.
-
 if "transaction_date" in transaction_df.columns:
-
     transaction_df["transaction_date_sort"] = pd.to_datetime(
-
-        transaction_df["transaction_date"],
-
-        errors="coerce",
-
+        transaction_df["transaction_date"], errors="coerce"
     )
-
     transaction_df["transaction_month"] = transaction_df["transaction_date_sort"].dt.month
+    transaction_df["transaction_month_label"] = transaction_df["transaction_date_sort"].dt.strftime("%B")
 
-    transaction_df["transaction_month_label"] = transaction_df[
-
-        "transaction_date_sort"
-
-    ].dt.strftime("%B")
-
-# Labels for internal data-quality flags.
-
+# labels for internal data-quality flags.
 quality_label_map = {
-
     "ok": "Clean records only",
-
     "price_per_sqm_high": "Flagged: unusually high price per m²",
-
     "surface_too_small": "Flagged: unusually small surface area",
-
     "high_room_count": "Flagged: unusually high room count",
-
 }
 
 def format_quality_label(flag):
+    return quality_label_map.get(str(flag), str(flag).replace("_", " ").title())
 
-    return quality_label_map.get(
-
-        str(flag),
-
-        str(flag).replace("_", " ").title(),
-
-    )
-
+# Property type to prevent apartments, houses, outbuildings, and commercial records from being mixed in one long list.
 filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
 
 with filter_col1:
-
     arr_values = sorted(
-
-        transaction_df["arrondissement"]
-
-        .dropna()
-
-        .astype(int)
-
-        .unique()
-
-        .tolist()
-
+        transaction_df["arrondissement"].dropna().astype(int).unique().tolist()
     )
-
     selected_arrondissement = st.selectbox(
-
         "Arrondissement",
-
         options=["All"] + arr_values,
-
-        format_func=lambda x: "All arrondissements"
-
-        if x == "All"
-
-        else f"{int(x)}{['th', 'st', 'nd', 'rd', 'th'][min(int(x) % 10, 4)]} arrondissement",
-
+        format_func=lambda x: "All arrondissements" if x == "All" else f"{int(x)}{['th','st','nd','rd','th'][min(int(x) % 10, 4)]} arrondissement",
     )
 
 with filter_col2:
-
-    property_values = (
-
-        sorted(transaction_df["property_type"].dropna().astype(str).unique().tolist())
-
-        if "property_type" in transaction_df.columns
-
-        else []
-
-    )
-
+    property_values = sorted(
+        transaction_df["property_type"].dropna().astype(str).unique().tolist()
+    ) if "property_type" in transaction_df.columns else []
     selected_property_type = st.selectbox(
-
         "Property type",
-
         options=["All"] + property_values,
-
         format_func=lambda x: "All property types" if x == "All" else x,
-
-        help=(
-
-            "Use this to focus the transaction list on apartments, houses, "
-
-            "outbuildings, or commercial records."
-
-        ),
-
+        help="Use this to focus the transaction list on apartments, houses, outbuildings, or commercial records.",
     )
 
 with filter_col3:
-
     quality_values = [
-
-        flag
-
-        for flag in [
-
-            "ok",
-
-            "price_per_sqm_high",
-
-            "surface_too_small",
-
-            "high_room_count",
-
-        ]
-
+        flag for flag in ["ok", "price_per_sqm_high", "surface_too_small", "high_room_count"]
         if flag in transaction_df["data_quality_flag"].dropna().unique().tolist()
-
     ]
-
     extra_quality_values = sorted(
-
-        [
-
-            flag
-
-            for flag in transaction_df["data_quality_flag"].dropna().unique().tolist()
-
-            if flag not in quality_values
-
-        ]
-
+        [flag for flag in transaction_df["data_quality_flag"].dropna().unique().tolist() if flag not in quality_values]
     )
-
     selected_quality = st.selectbox(
-
         "Data quality",
-
         options=["All"] + quality_values + extra_quality_values,
-
         index=1 if "ok" in quality_values else 0,
-
-        format_func=lambda x: "All records"
-
-        if x == "All"
-
-        else format_quality_label(x),
-
-        help=(
-
-            "Clean records passed the basic quality checks. Flagged records are "
-
-            "kept available for review but are excluded from the map layer."
-
-        ),
-
+        format_func=lambda x: "All records" if x == "All" else format_quality_label(x),
+        help="Clean records passed the basic quality checks. Flagged records are kept available for review but are excluded from the map layer.",
     )
 
 with filter_col4:
-
     if "transaction_month" in transaction_df.columns:
-
         month_lookup = (
-
             transaction_df[["transaction_month", "transaction_month_label"]]
-
             .dropna()
-
             .drop_duplicates()
-
             .sort_values("transaction_month")
-
         )
-
         month_options = ["All"] + month_lookup["transaction_month"].astype(int).tolist()
-
         month_label_map = dict(
-
-            zip(
-
-                month_lookup["transaction_month"].astype(int),
-
-                month_lookup["transaction_month_label"],
-
-            )
-
+            zip(month_lookup["transaction_month"].astype(int), month_lookup["transaction_month_label"])
         )
-
     else:
-
         month_options = ["All"]
-
         month_label_map = {}
 
     selected_month = st.selectbox(
-
         "Transaction month",
-
         options=month_options,
-
-        format_func=lambda x: "All months"
-
-        if x == "All"
-
-        else month_label_map.get(int(x), str(x)),
-
+        format_func=lambda x: "All months" if x == "All" else month_label_map.get(int(x), str(x)),
         help="Filter transactions to a specific month in 2025.",
-
     )
 
 filtered_transactions = transaction_df.copy()
 
 if selected_arrondissement != "All":
-
     filtered_transactions = filtered_transactions[
-
         filtered_transactions["arrondissement"] == int(selected_arrondissement)
-
     ]
 
 if selected_property_type != "All" and "property_type" in filtered_transactions.columns:
-
     filtered_transactions = filtered_transactions[
-
         filtered_transactions["property_type"].astype(str) == selected_property_type
-
     ]
 
 if selected_quality != "All":
-
     filtered_transactions = filtered_transactions[
-
         filtered_transactions["data_quality_flag"] == selected_quality
-
     ]
 
 if selected_month != "All" and "transaction_month" in filtered_transactions.columns:
-
     filtered_transactions = filtered_transactions[
-
         filtered_transactions["transaction_month"] == int(selected_month)
-
     ]
 
 search_query = st.text_input(
-
     "Search within filtered transactions",
-
     placeholder="Street, address, transaction key, date, or property type",
-
 )
 
 if search_query and len(search_query.strip()) >= 2:
-
     q = search_query.strip().upper()
-
     searchable_cols = [
-
-        c
-
-        for c in [
-
+        c for c in [
             "address",
-
             "transaction_key",
-
             "transaction_date",
-
             "property_type",
-
             "postal_code",
-
         ]
-
         if c in filtered_transactions.columns
-
     ]
 
     if searchable_cols:
-
         mask = pd.Series(False, index=filtered_transactions.index)
-
         for col in searchable_cols:
-
-            mask = mask | (
-
-                filtered_transactions[col]
-
-                .fillna("")
-
-                .astype(str)
-
-                .str.upper()
-
-                .str.contains(q, regex=False)
-
-            )
-
+            mask = mask | filtered_transactions[col].fillna("").astype(str).str.upper().str.contains(q, regex=False)
         filtered_transactions = filtered_transactions[mask]
 
 # Sort the underlying filtered results before showing/selecting them.
-
 filtered_transactions = filtered_transactions.copy()
-
 if "transaction_date_sort" in filtered_transactions.columns:
-
     filtered_transactions = filtered_transactions.sort_values(
-
-        "transaction_date_sort",
-
-        ascending=False,
-
-        na_position="last",
-
+        "transaction_date_sort", ascending=False, na_position="last"
     )
 
 st.caption(f"{len(filtered_transactions):,} matching transaction(s)")
 
 # Add a cleaner user-facing quality label for tables and details.
-
 if "data_quality_flag" in filtered_transactions.columns:
+    filtered_transactions["data_quality"] = filtered_transactions["data_quality_flag"].apply(format_quality_label)
 
-    filtered_transactions["data_quality"] = filtered_transactions[
-
-        "data_quality_flag"
-
-    ].apply(format_quality_label)
-
-# Show preview table.
-
+# Show preview table
 preview_cols = [
-
-    c
-
-    for c in [
-
+    c for c in [
         "transaction_date",
-
         "address",
-
         "arrondissement",
-
         "property_type",
-
         "surface_area",
-
         "room_count",
-
         "property_value",
-
         "price_per_sqm",
-
         "data_quality",
-
         "transaction_key",
-
     ]
-
     if c in filtered_transactions.columns
-
 ]
 
 if filtered_transactions.empty:
-
     st.info("No transactions found. Try changing the filters or using a broader search term.")
-
 else:
-
+    # Keep the preview lightweight and user-friendly. For larger result sets, users
+    # should filter/search rather than loading thousands of rows into the preview.
     row_options = [25, 50, 100, 250, 500, 1000]
-
     row_options = [n for n in row_options if n <= len(filtered_transactions)]
-
     if len(filtered_transactions) not in row_options and len(filtered_transactions) < 25:
-
         row_options.append(len(filtered_transactions))
 
     preview_limit = st.selectbox(
-
         "Rows shown in preview",
-
         options=row_options,
-
-        index=min(2, len(row_options) - 1),
-
-        help=(
-
-            "Choose how many rows to display. Use the filters or search box "
-
-            "to narrow larger result sets."
-
-        ),
-
+        index=min(2, len(row_options) - 1),  # Default to 100 rows when available
+        help="Choose how many rows to display. Use the filters or search box to narrow larger result sets.",
     )
 
     preview = filtered_transactions[preview_cols].head(preview_limit).copy()
-
     st.dataframe(preview, use_container_width=True, hide_index=True)
 
-    # Create dropdown labels.
-
+    # Create dropdown labels
     selection_limit = min(500, len(filtered_transactions))
-
     selection_df = filtered_transactions.head(selection_limit).copy()
 
     def format_transaction_option(idx):
-
         row = selection_df.loc[idx]
-
         address = row.get("address", "Unknown address")
-
         date = row.get("transaction_date", "—")
-
         price = row.get("price_per_sqm", np.nan)
-
         rooms = row.get("room_count", np.nan)
-
         price_txt = f"€{price:,.0f}/m²" if pd.notna(price) else "no €/m²"
-
         rooms_txt = f"{int(rooms)} room(s)" if pd.notna(rooms) else "rooms unknown"
-
         return f"{address} · {date} · {rooms_txt} · {price_txt}"
 
     selected_idx = st.selectbox(
-
         "Select a transaction",
-
         options=selection_df.index.tolist(),
-
         format_func=format_transaction_option,
-
         help="",
-
     )
 
     selected_row = selection_df.loc[selected_idx]
 
     # Spatial join to get quarter_id for the selected result.
-
     selected_with_quarter = selected_row.copy()
-
     if pd.notna(selected_row.get("lon")) and pd.notna(selected_row.get("lat")):
-
         selected_gdf = gpd.GeoDataFrame(
-
             pd.DataFrame([selected_row]),
-
-            geometry=gpd.points_from_xy(
-
-                [selected_row["lon"]],
-
-                [selected_row["lat"]],
-
-            ),
-
+            geometry=gpd.points_from_xy([selected_row["lon"]], [selected_row["lat"]]),
             crs="EPSG:4326",
-
         )
-
         joined = gpd.sjoin(
-
             selected_gdf[["transaction_key", "geometry"]],
-
             q_gdf[["quarter_id", "quarter_name", "geometry"]],
-
             how="left",
-
             predicate="within",
-
         )
-
         if not joined.empty:
-
             selected_with_quarter["quarter_id"] = joined.iloc[0].get("quarter_id")
-
             selected_with_quarter["quarter_name"] = joined.iloc[0].get("quarter_name")
 
-    rent_lookup = rent_raw[rent_raw["room_count"] == room_count].set_index(
-
-        "quarter_id"
-
-    )[
-
-        [
-
-            "reference_rent",
-
-            "min_rent",
-
-            "max_rent",
-
-            "quarter_name",
-
-        ]
-
+    rent_lookup = rent_raw[rent_raw["room_count"] == room_count].set_index("quarter_id")[
+        ["reference_rent", "min_rent", "max_rent", "quarter_name"]
     ]
 
     flag = selected_with_quarter.get("data_quality_flag", "ok")
-
     flag_color = "#dc2626" if flag != "ok" else "#16a34a"
-
     qid = selected_with_quarter.get("quarter_id")
-
-    rent_row = (
-
-        rent_lookup.loc[qid]
-
-        if pd.notna(qid) and qid in rent_lookup.index
-
-        else None
-
-    )
+    rent_row = rent_lookup.loc[qid] if (pd.notna(qid) and qid in rent_lookup.index) else None
 
     st.markdown("### Selected Transaction")
-
     col_l, col_r = st.columns(2)
 
     with col_l:
-
         st.markdown("**Transaction Details**")
-
-        st.markdown(
-
-            f"""
-
+        st.markdown(f"""
 | Field | Value |
-
 |---|---|
-
-| Transaction Key | `{selected_with_quarter.get('transaction_key', '—')}` |
-
+| Transaction Key | {selected_with_quarter.get('transaction_key', '—')} |
 | Date | {selected_with_quarter.get('transaction_date', '—')} |
-
 | Address | {selected_with_quarter.get('address', '—')} |
-
 | Arrondissement | {int(selected_with_quarter.get('arrondissement')) if pd.notna(selected_with_quarter.get('arrondissement')) else '—'} |
-
 | Property Type | {selected_with_quarter.get('property_type', '—')} |
-
 | Surface Area | {f"{selected_with_quarter['surface_area']:.1f} m²" if pd.notna(selected_with_quarter.get('surface_area')) else '—'} |
-
 | Rooms | {int(selected_with_quarter['room_count']) if pd.notna(selected_with_quarter.get('room_count')) else '—'} |
-
 | Property Value | {f"€{selected_with_quarter['property_value']:,.0f}" if pd.notna(selected_with_quarter.get('property_value')) else '—'} |
-
 | Price / m² | {f"€{selected_with_quarter['price_per_sqm']:,.0f}" if pd.notna(selected_with_quarter.get('price_per_sqm')) else '—'} |
-
 | Data Quality | <span style='color:{flag_color}'>{format_quality_label(flag)}</span> |
-
-""",
-
-            unsafe_allow_html=True,
-
-        )
+        """, unsafe_allow_html=True)
 
     with col_r:
-
         st.markdown(f"**Rent Control: {room_label}**")
-
         if rent_row is not None:
-
-            quarter_name = selected_with_quarter.get(
-
-                "quarter_name",
-
-                rent_row.get("quarter_name", "—"),
-
-            )
-
+            quarter_name = selected_with_quarter.get("quarter_name", rent_row.get("quarter_name", "—"))
             ref = rent_row["reference_rent"]
-
             rmin = rent_row["min_rent"]
-
             rmax = rent_row["max_rent"]
-
-            st.markdown(
-
-                f"""
-
+            st.markdown(f"""
 | Field | Value |
-
 |---|---|
-
 | Quarter | {quarter_name} |
-
 | Min rent | €{rmin:.1f} /m² |
-
 | Reference rent | €{ref:.1f} /m² |
-
 | Max rent | €{rmax:.1f} /m² |
-
-"""
-
-            )
-
+            """)
             if pd.notna(selected_with_quarter.get("surface_area")):
-
                 st.markdown(
-
                     f"*Implied monthly rent at reference: "
-
                     f"**€{ref * selected_with_quarter['surface_area']:.0f}/month***"
-
                 )
-
         else:
-
             st.info("No rent-control data available for this location.")
