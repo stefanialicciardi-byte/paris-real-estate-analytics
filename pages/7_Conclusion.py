@@ -49,7 +49,7 @@ st.info("""
 # -------------------------
 st.markdown("---") 
 
-st.header("Challenges and solutions going forward")
+st.header("Challenges and solutions looking forward")
 
 r1c1, r1c2 = st.columns(2)
 
@@ -75,13 +75,12 @@ with r1c2:
         <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px;">
         <strong>Joining Geographic Data</strong><br>
         <span style="color:#6b7280; font-size:0.9rem;">
+        <br>
+        <p> 🛠  One significant challenge we faced is how to integrate geographic data into our schema. Since the relationships between variables are spacial, a traditional primary key / foreign key relationship isn't applicable.
         
+        <p> ✅  Since the scope of our project didn't require a full geospatial schema, our hybrid star model sufficed.
         
-        One significant challenge we faced is how to integrate geographic data into our schema. Since the relationships between variables are spacial, a traditional primary key / foreign key relationship isn't applicable.
-        
-        Since the scope of our project didn't require a full geospatial schema, our hybrid star model sufficed.
-        
-        Looking forward, if the further development of a geospatial layer is key aspect of the analysis, working with PostgreSQL and PostGIS would be a more suitable option.
+        <p> 💡 Looking forward, if the further development of a geospatial layer is key aspect of the analysis, working with PostgreSQL and PostGIS would be a more suitable option.
         </span>
         </div>
         """, unsafe_allow_html=True,
