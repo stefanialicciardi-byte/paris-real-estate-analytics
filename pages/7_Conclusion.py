@@ -38,9 +38,11 @@ st.caption(
 st.markdown("---") 
 
 st.header("Key findings from the data")
-st.markdown("...")
-
-st.markdown("---") 
+st.info("""
+* **The most expensive arrondissements don't necessarily have more green spaces**: This suggests that location and centrality are stronger price drivers, while green spaces provide useful additional context.
+* **High property prices follow high reference rent values when accounding for room number**: The high demand, short supply of small, 1-room units in the city translates to higher prices in both the sale and rental markets.   
+* **Owners hold on to smaller properties in popular areas: Properties with higher reference rents tend to have lower transaction volumes. In the case of 1-room properties, this may reflect a preference for holding onto smaller units rather than selling them.
+""")
 
 # -------------------------
 #  Challenges and Lessons Learned
