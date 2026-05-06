@@ -16,7 +16,7 @@ from matplotlib.colorbar import ColorbarBase
 from data_loader import load_dvf, load_rent, load_green, load_planned
 
 st.set_page_config(
-    page_title="Analysis",
+    page_title="Integrated Map",
     layout="wide",
 )
 

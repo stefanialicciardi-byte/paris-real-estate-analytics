@@ -3,6 +3,9 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 import json
+import folium
+import requests
+from streamlit_folium import st_folium
 from shapely.geometry import shape
 from data_loader import load_dvf, load_rent
 
@@ -27,12 +30,36 @@ def build_quartier_gdf(_rent_df):
 
 q_gdf = build_quartier_gdf(rent_raw)
 
+@st.cache_data(ttl=86400)
+def load_arrondissement_geojson():
+    from shapely.geometry import shape, mapping, MultiPolygon
+    url = (
+        "https://opendata.paris.fr/api/explore/v2.1/catalog/datasets/"
+        "arrondissements/exports/geojson?lang=fr&timezone=Europe%2FParis"
+    )
+    try:
+        data = requests.get(url, timeout=10).json()
+    except Exception:
+        return None
+    clean = []
+    for feat in data.get("features", []):
+        geom = shape(feat["geometry"])
+        if isinstance(geom, MultiPolygon):
+            geom = max(geom.geoms, key=lambda p: p.area)
+        feat = dict(feat)
+        feat["geometry"] = mapping(geom)
+        clean.append(feat)
+    data["features"] = clean
+    return data
+
+arr_geojson = load_arrondissement_geojson()
+
 #  Header
 st.title("Transaction Search")
 st.markdown("Filter and explore individual DVF apartment transactions · Paris 2025")
 st.markdown("---")
 
-#  Sidebar: rent room selector (needed for rent-control detail panel)
+#  Sidebar: rent room selector
 with st.sidebar:
     st.markdown("## Controls")
     st.markdown("---")
@@ -81,6 +108,12 @@ quality_label_map = {
 
 def format_quality_label(flag):
     return quality_label_map.get(str(flag), str(flag).replace("_", " ").title())
+
+def ordinal(n):
+    n = int(n)
+    if 11 <= (n % 100) <= 13:
+        return f"{n}th"
+    return f"{n}{['th','st','nd','rd','th'][min(n % 10, 4)]}"
 
 #  Filters
 filter_col1, filter_col2, filter_col3, filter_col4 = st.columns(4)
@@ -191,8 +224,6 @@ if "transaction_date_sort" in filtered_transactions.columns:
         "transaction_date_sort", ascending=False, na_position="last"
     )
 
-st.caption(f"{len(filtered_transactions):,} matching transaction(s)")
-
 if "data_quality_flag" in filtered_transactions.columns:
     filtered_transactions["data_quality"] = filtered_transactions["data_quality_flag"].apply(format_quality_label)
 
@@ -209,31 +240,22 @@ preview_cols = [
 if filtered_transactions.empty:
     st.info("No transactions found. Try changing the filters or using a broader search term.")
 else:
-    row_options = [n for n in [25, 50, 100, 250, 500, 1000] if n <= len(filtered_transactions)]
-    if not row_options:
-        row_options = [len(filtered_transactions)]
+    st.markdown(f"### {len(filtered_transactions):,} transactions")
 
-    preview_limit = st.selectbox(
-        "Rows shown in preview",
-        options=row_options,
-        index=min(2, len(row_options) - 1),
-    )
-
-    preview = filtered_transactions[preview_cols].head(preview_limit).copy()
+    preview = filtered_transactions[preview_cols].head(100).copy()
     st.dataframe(preview, use_container_width=True, hide_index=True)
 
     st.markdown("---")
-    st.subheader("Transaction Detail")
 
     selection_limit = min(500, len(filtered_transactions))
     selection_df = filtered_transactions.head(selection_limit).copy()
 
     def format_transaction_option(idx):
         row = selection_df.loc[idx]
-        address  = row.get("address", "Unknown address")
-        date     = row.get("transaction_date", "—")
-        price    = row.get("price_per_sqm", np.nan)
-        rooms    = row.get("room_count", np.nan)
+        address   = row.get("address", "Unknown address")
+        date      = row.get("transaction_date", "—")
+        price     = row.get("price_per_sqm", np.nan)
+        rooms     = row.get("room_count", np.nan)
         price_txt = f"€{price:,.0f}/m²" if pd.notna(price) else "no €/m²"
         rooms_txt = f"{int(rooms)} room(s)" if pd.notna(rooms) else "rooms unknown"
         return f"{address} · {date} · {rooms_txt} · {price_txt}"
@@ -248,7 +270,9 @@ else:
 
     #  Spatial join to get quarter
     selected_with_quarter = selected_row.copy()
-    if pd.notna(selected_row.get("lon")) and pd.notna(selected_row.get("lat")):
+    has_coords = pd.notna(selected_row.get("lon")) and pd.notna(selected_row.get("lat"))
+
+    if has_coords:
         selected_gdf = gpd.GeoDataFrame(
             pd.DataFrame([selected_row]),
             geometry=gpd.points_from_xy([selected_row["lon"]], [selected_row["lat"]]),
@@ -273,51 +297,117 @@ else:
     qid        = selected_with_quarter.get("quarter_id")
     rent_row   = rent_lookup.loc[qid] if (pd.notna(qid) and qid in rent_lookup.index) else None
 
-    def ordinal(n):
-        n = int(n)
-        if 11 <= (n % 100) <= 13:
-            return f"{n}th"
-        return f"{n}{['th','st','nd','rd','th'][min(n % 10, 4)]}"
+    # Layout: detail tables left (2/3), mini-map right (1/3)
+    col_detail, col_map = st.columns([2, 1])
 
-    col_l, col_r = st.columns(2)
-
-    with col_l:
-        st.markdown("**Transaction Details**")
+    with col_detail:
+        col_l, col_r = st.columns(2)
         arr_val = selected_with_quarter.get("arrondissement")
-        st.markdown(f"""
-| Field | Value |
-|---|---|
-| Transaction Key | {selected_with_quarter.get('transaction_key', '—')} |
-| Date | {selected_with_quarter.get('transaction_date', '—')} |
-| Address | {selected_with_quarter.get('address', '—')} |
-| Arrondissement | {ordinal(arr_val) if pd.notna(arr_val) else '—'} |
-| Property Type | {selected_with_quarter.get('property_type', '—')} |
-| Surface Area | {f"{selected_with_quarter['surface_area']:.1f} m²" if pd.notna(selected_with_quarter.get('surface_area')) else '—'} |
-| Rooms | {int(selected_with_quarter['room_count']) if pd.notna(selected_with_quarter.get('room_count')) else '—'} |
-| Property Value | {f"€{selected_with_quarter['property_value']:,.0f}" if pd.notna(selected_with_quarter.get('property_value')) else '—'} |
-| Price / m² | {f"€{selected_with_quarter['price_per_sqm']:,.0f}" if pd.notna(selected_with_quarter.get('price_per_sqm')) else '—'} |
-| Data Quality | <span style='color:{flag_color}'>{format_quality_label(flag)}</span> |
-        """, unsafe_allow_html=True)
+        flag_badge_bg  = "#fee2e2" if flag != "ok" else "#dcfce7"
+        flag_badge_txt = "#991b1b" if flag != "ok" else "#166534"
 
-    with col_r:
-        st.markdown(f"**Rent Control: {room_label}**")
-        if rent_row is not None:
-            quarter_name = selected_with_quarter.get("quarter_name", rent_row.get("quarter_name", "—"))
-            ref  = rent_row["reference_rent"]
-            rmin = rent_row["min_rent"]
-            rmax = rent_row["max_rent"]
-            st.markdown(f"""
-| Field | Value |
-|---|---|
-| Quarter | {quarter_name} |
-| Min rent | €{rmin:.1f} /m² |
-| Reference rent | €{ref:.1f} /m² |
-| Max rent | €{rmax:.1f} /m² |
-            """)
-            if pd.notna(selected_with_quarter.get("surface_area")):
+        card_style = (
+            "background:#f8f9fa; border-radius:8px; border:1px solid #e5e7eb;"
+            "padding:16px 18px; height:100%;"
+        )
+        row_style  = "display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #f0f0f0; font-size:13.5px;"
+        label_style = "color:#6b7280;"
+        value_style = "color:#111827; font-weight:500; text-align:right; max-width:60%;"
+
+        with col_l:
+            st.markdown("**Transaction Details**")
+            st.markdown(
+                f"""<div style="{card_style}">
+  <div style="{row_style}"><span style="{label_style}">Key</span><span style="{value_style}">{selected_with_quarter.get('transaction_key', '—')}</span></div>
+  <div style="{row_style}"><span style="{label_style}">Date</span><span style="{value_style}">{selected_with_quarter.get('transaction_date', '—')}</span></div>
+  <div style="{row_style}"><span style="{label_style}">Address</span><span style="{value_style}">{selected_with_quarter.get('address', '—')}</span></div>
+  <div style="{row_style}"><span style="{label_style}">Arrondissement</span><span style="{value_style}">{ordinal(arr_val) if pd.notna(arr_val) else '—'}</span></div>
+  <div style="{row_style}"><span style="{label_style}">Property type</span><span style="{value_style}">{selected_with_quarter.get('property_type', '—')}</span></div>
+  <div style="{row_style}"><span style="{label_style}">Surface area</span><span style="{value_style}">{f"{selected_with_quarter['surface_area']:.1f} m²" if pd.notna(selected_with_quarter.get('surface_area')) else '—'}</span></div>
+  <div style="{row_style}"><span style="{label_style}">Rooms</span><span style="{value_style}">{int(selected_with_quarter['room_count']) if pd.notna(selected_with_quarter.get('room_count')) else '—'}</span></div>
+  <div style="{row_style}"><span style="{label_style}">Property value</span><span style="{value_style}">{f"€{selected_with_quarter['property_value']:,.0f}" if pd.notna(selected_with_quarter.get('property_value')) else '—'}</span></div>
+  <div style="{row_style}"><span style="{label_style}">Price / m²</span><span style="{value_style}">{f"€{selected_with_quarter['price_per_sqm']:,.0f}" if pd.notna(selected_with_quarter.get('price_per_sqm')) else '—'}</span></div>
+  <div style="display:flex; justify-content:space-between; padding:5px 0; font-size:13.5px;"><span style="{label_style}">Data quality</span><span style="background:{flag_badge_bg}; color:{flag_badge_txt}; font-size:12px; font-weight:500; padding:2px 10px; border-radius:12px;">{format_quality_label(flag)}</span></div>
+</div>""",
+                unsafe_allow_html=True,
+            )
+
+        with col_r:
+            if rent_row is not None:
+                quarter_name = selected_with_quarter.get("quarter_name", rent_row.get("quarter_name", "—"))
+                ref  = rent_row["reference_rent"]
+                rmin = rent_row["min_rent"]
+                rmax = rent_row["max_rent"]
+                implied = f"€{ref * selected_with_quarter['surface_area']:,.0f} / month" if pd.notna(selected_with_quarter.get("surface_area")) else None
+                implied_html = f'''<div style="margin-top:12px; background:#eff6ff; border-radius:6px; padding:10px 12px; font-size:13px; color:#1e40af;">Implied monthly rent at reference: <strong>{implied}</strong></div>''' if implied else ""
+                st.markdown(f"**Rent Control · {room_label}**")
                 st.markdown(
-                    f"*Implied monthly rent at reference: "
-                    f"**€{ref * selected_with_quarter['surface_area']:.0f}/month***"
+                    f"""<div style="{card_style}">
+  <div style="{row_style}"><span style="{label_style}">Quarter</span><span style="{value_style}">{quarter_name}</span></div>
+  <div style="{row_style}"><span style="{label_style}">Min rent</span><span style="{value_style}">€{rmin:.1f} /m²</span></div>
+  <div style="{row_style}"><span style="{label_style}">Reference rent</span><span style="{value_style}">€{ref:.1f} /m²</span></div>
+  <div style="display:flex; justify-content:space-between; padding:5px 0; font-size:13.5px;"><span style="{label_style}">Max rent</span><span style="{value_style}">€{rmax:.1f} /m²</span></div>
+  {implied_html}
+</div>""",
+                    unsafe_allow_html=True,
                 )
+            else:
+                st.info("No rent-control data available for this location.")
+
+    with col_map:
+        st.markdown("**Location**")
+        if has_coords:
+            lat = float(selected_row["lat"])
+            lon = float(selected_row["lon"])
+            address_label = selected_with_quarter.get("address", "")
+
+            mini_map = folium.Map(
+                location=[48.8566, 2.3522],
+                zoom_start=11,
+                tiles="CartoDB positron",
+                zoom_control=True,
+                scrollWheelZoom=False,
+                dragging=True,
+                attributionControl=False,
+            )
+
+
+            if arr_geojson:
+                folium.GeoJson(
+                    arr_geojson,
+                    name="Arrondissements",
+                    style_function=lambda x: {
+                        "fillColor": "transparent",
+                        "color": "#888888",
+                        "weight": 1.2,
+                        "fillOpacity": 0,
+                    },
+                    tooltip=folium.GeoJsonTooltip(
+                        fields=["l_aroff"],
+                        aliases=[""],
+                        style=(
+                            "background-color: white;"
+                            "border: 1px solid #ccc;"
+                            "border-radius: 4px;"
+                            "font-family: sans-serif;"
+                            "font-size: 12px;"
+                            "padding: 4px 8px;"
+                        ),
+                        sticky=False,
+                    ),
+                ).add_to(mini_map)
+
+            folium.CircleMarker(
+                location=[lat, lon],
+                radius=9,
+                color="#ffffff",
+                weight=2,
+                fill=True,
+                fill_color="#1565C0",
+                fill_opacity=1,
+                tooltip=address_label,
+            ).add_to(mini_map)
+
+            st_folium(mini_map, width="100%", height=440, returned_objects=[])
         else:
-            st.info("No rent-control data available for this location.")
+            st.info("No coordinates available for this transaction.")

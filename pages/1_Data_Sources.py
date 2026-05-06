@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from data_loader import load_dvf, load_rent, load_green, load_planned
 
-st.set_page_config(page_title="Data Sources", page_icon="📦", layout="wide")
+st.set_page_config(page_title="Data Sources", page_icon=":globe_with_meridians:", layout="wide")
 
 dvf     = load_dvf()
 rent    = load_rent()
