@@ -50,21 +50,22 @@ with col2:
             margin-bottom:20px;
             line-height:1.6;
         ">
-        <strong style="font-size:1.05rem;">Managing geospacial data</strong><br>
-
-        <div style="color:#6b7280; font-size:0.95rem; margin-top:12px;">
-        **High reference rent values follow high property prices**: 
+        <strong style="font-size:1.05rem;"> High reference rent values follow high property prices</strong><br>
+        <div style="color:#6b7280; font-size:0.95rem; margin-top:12px;"> 
         The high demand, short supply of small, centrally located units translates to higher prices in both the sale and rental markets.   
 
-         <p>**Low market liquidity central areas**: 
-         High reference rent zones tend to have lower transaction volumes. In the case of 1-room properties, this may reflect an owner's preference for holding onto smaller, centrally located units.
+        <strong style="font-size:1.05rem;"> Low market liquidity in central areas</strong><br>
+        <p>**Low market liquidity central areas**: 
+        <div style="color:#6b7280; font-size:0.95rem; margin-top:12px;"> 
+        High reference rent zones tend to have lower transaction volumes. In the case of 1-room properties, this may reflect an owner's preference for holding onto smaller, centrally located units.
 
-         <p>**The most expensive living areas aren't the most green**:
-        Location and centrality are stronger price drivers, while green spaces provide useful additional context.
-        </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+         <strong style="font-size:1.05rem;"> The most expensive living areas aren't the most green</strong><br>
+         <div style="color:#6b7280; font-size:0.95rem; margin-top:12px;"> 
+         Location and centrality are stronger price drivers, while green spaces provide useful additional context.
+         </div>
+         </div>
+         """,
+         unsafe_allow_html=True,
     )
     
 with col1:
