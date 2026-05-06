@@ -61,11 +61,11 @@ with r1c1:
         <strong>Manual Uploads Slow Pipeline and Increase Risk of Error</strong><br>
         <span style="color:#6b7280; font-size:0.9rem;">
         <br>
-        <p> 🛠  The main weakness of our ETL pipeline is the manual uploads involved at multiple steps in the pipeline. 
-        
-        <p> ✅  To ensure consistency, there are checkpoints along the way where necessary data uploads are flagged.
-        
-        <p> 💡  Looking forward, one solution would be to integrate the entire pipeline into Snowflake (which was not possible with a trial account).
+        🛠  The main weakness of our ETL pipeline is the manual uploads involved at multiple steps in the pipeline. 
+        <br>
+        ✅  To ensure consistency, there are checkpoints along the way where necessary data uploads are flagged.
+        <br>
+        💡  Looking forward, one solution would be to integrate the entire pipeline into Snowflake (which was not possible with a trial account).
         </span>
         </div>
         """, unsafe_allow_html=True,
@@ -73,10 +73,10 @@ with r1c1:
 
 with r1c2:
     etl_path = ASSETS_DIR / "ETL.png"
-        if schema_path.exists():
-            st.image(str(etl_path), use_container_width=True)
-        else:
-            st.warning("Image not found. Place ETL.png in the assets/ folder.")
+    if schema_path.exists():
+        st.image(str(etl_path), use_container_width=True)
+    else:
+        st.warning("Image not found. Place ETL.png in the assets/ folder.")
 
 with r2c1:
     st.markdown(
@@ -85,11 +85,11 @@ with r2c1:
         <strong>Joining Geographic Data</strong><br>
         <span style="color:#6b7280; font-size:0.9rem;">
         <br>
-        <p> 🛠  One significant challenge we faced is how to integrate geographic data into our schema. Since the relationships between variables are spacial, a traditional primary key / foreign key relationship isn't applicable.
-        
-        <p> ✅  Since the scope of our project didn't require a full geospatial schema, our simplified hybrid star model sufficed.
-        
-        <p> 💡  To further develop the geospatial layer, one could create a non-relational database for the geospatial table elements. Along with other providers, Snowflake also supports storing and querying geospatial formats.
+        🛠  One significant challenge we faced is how to integrate geographic data into our schema. Since the relationships between variables are spacial, a traditional primary key / foreign key relationship isn't applicable.
+        <br>
+        ✅  Since the scope of our project didn't require a full geospatial schema, our simplified hybrid star model sufficed.
+        <br>
+        💡  To further develop the geospatial layer, one could create a non-relational database for the geospatial table elements. Along with other providers, Snowflake also supports storing and querying geospatial formats.
         </span>
         </div>
         """, unsafe_allow_html=True,
