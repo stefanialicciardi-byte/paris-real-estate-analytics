@@ -70,6 +70,7 @@ with r1c1:
 
 with r1c2:
     etl_path = ASSETS_DIR / "ETL.png"
+
     if etl_path.exists():
         st.image(str(etl_path), use_container_width=True)
     else:
