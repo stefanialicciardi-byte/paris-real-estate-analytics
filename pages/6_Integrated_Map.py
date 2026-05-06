@@ -53,7 +53,7 @@ with st.sidebar:
     st.caption("DVF 2025 · Rent control data · Open Data Paris")
 
 #  Header
-st.title("Analysis")
+st.title("Integrated Map")
 st.markdown("Interactive map of sale prices, rent-control zones, and green spaces · Paris 2025")
 st.markdown("---")
 
