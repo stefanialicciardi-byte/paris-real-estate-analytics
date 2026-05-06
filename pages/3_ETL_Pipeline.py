@@ -235,8 +235,6 @@ with col3:
         """
         <div style="background:#f8f9fa; border-radius:8px; padding:14px 18px;">
         <strong>Open issue</strong><br>
-        DIM_QUARTER requires the rent-control CSV
-        to be loaded into the PUBLIC schema first.
         Green-spaces spatial integration pending.
         </div>
         """, unsafe_allow_html=True,
