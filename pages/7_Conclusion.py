@@ -58,11 +58,13 @@ st.markdown("<br>", unsafe_allow_html=True)
 # -------------------------
 # Reusable card component
 # -------------------------
+
 def render_card(title: str, paragraphs: list[str]):
-    """
-    Renders a styled card with a title and multiple paragraphs.
-    """
-    content_html = "".join([f"<p>{p}</p>" for p in paragraphs])
+
+    # Escape content to avoid breaking HTML
+    content_html = "".join([
+        f"<p>{html.escape(p)}</p>" for p in paragraphs
+    ])
 
     st.markdown(
         f"""
@@ -81,7 +83,7 @@ def render_card(title: str, paragraphs: list[str]):
             </div>
         </div>
         """,
-        unsafe_allow_html=True,
+        unsafe_allow_html=True
     )
 
 # -------------------------
