@@ -48,11 +48,11 @@ green-space availability across Paris.**
 with col_right:
     ASSETS_DIR = Path(__file__).parent.parent / "assets"
     paris_path = ASSETS_DIR / "paris.png"
-
+    st.markdown(str(ASSETS_DIR))
     st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 
     if paris_path.exists():
-        st.image("assets/paris.png", use_container_width=True)
+        st.image(str(paris_path), use_container_width=True)
     else:
         st.warning("Image not found. Place paris.png in the assets/ folder.")
     st.caption("Andreas Weilguny, Unsplash (2025)")
