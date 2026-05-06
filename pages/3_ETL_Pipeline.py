@@ -218,7 +218,7 @@ LEFT JOIN gs_agg  gs  ON gs.arrondissement_id  = a.arrondissement_id
 LEFT JOIN pgs_agg pgs ON pgs.arrondissement_id = a.arrondissement_id;""", language="sql")
 
     st.markdown("---")
-
+st.markdown("---")
 # Implementation Summary
 st.subheader("Implementation Summary")
 
