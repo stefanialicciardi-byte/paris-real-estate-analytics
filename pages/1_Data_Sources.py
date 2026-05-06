@@ -105,7 +105,8 @@ st.markdown(
     """
     <div style="background:#fff8f0; border-left:5px solid #f59e0b; padding:16px 20px; border-radius:6px;">
     <ul style="margin:0; padding-left:18px; color:#1f2937; font-size:0.95rem; line-height:1.8;">
-    <li>DVF does not include construction period or furnished/unfurnished status, limiting exact matching to rent-control categories. Rent-control values were averaged across room-count categories to obtain a representative zone-level value for mapping.</li>
+    <li>The DVF dataset does not include the source document ID for each transaction, which necessitated creating a composite primary key based on multiple variables.
+    <li>The DVF does not include construction period or furnished/unfurnished status, limiting exact matching to rent-control categories. Rent-control values were averaged across room-count categories to obtain a representative zone-level value for mapping.</li>
     <li>Planned green spaces are only available at arrondissement level, so no street-level spatial join is possible to match directly to a rent control zone.</li>
     </ul>
     </div>
