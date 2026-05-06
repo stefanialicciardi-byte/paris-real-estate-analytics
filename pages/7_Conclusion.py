@@ -59,7 +59,7 @@ with r1c1:
     st.markdown(
         """
         <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px;">
-        <strong>Manual Uploads Slow Pipeline and Increase Risk of Error</strong><br>
+        <strong>Manual steps slow pipeline and increase error risk</strong><br>
         <span style="color:#6b7280; font-size:0.9rem;">
         <p>🛠  The main weakness of our ETL pipeline is the manual uploads involved at multiple steps in the pipeline. 
         <p>✅  To ensure consistency, there are checkpoints along the way where necessary data uploads are flagged.
@@ -92,3 +92,10 @@ with r2c1:
         </div>
         """, unsafe_allow_html=True,
     )
+
+with r2c2:
+    geo_path= ASSETS_DIR / "geo.png"
+    if geo_path.exists():
+        st.image(str(geo_path), use_container_width=True)
+    else:
+        st.warning("Image not found. Place geo.png in the assets/ folder.")
