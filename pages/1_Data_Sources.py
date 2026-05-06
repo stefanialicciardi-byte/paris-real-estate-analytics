@@ -93,11 +93,6 @@ with col_r:
 rent-control zones. Using geographic polygons, each DVF property is matched to its
 rent-control zone via point-in-polygon spatial join.
 
-**Limitations of matching:** DVF does not contain construction period or furnished/unfurnished
-status, both of which are used by the rent-control dataset to determine reference rents.
-Exact property-level matching is therefore not fully possible without external enrichment.
-Construction periods were averaged across categories.
-
 **Green space join:** Planned green spaces are joined by arrondissement. Existing green spaces
 require a spatial join and remain a point for further modelling.
     """)
@@ -111,7 +106,6 @@ st.markdown(
     <div style="background:#fff8f0; border-left:5px solid #f59e0b; padding:16px 20px; border-radius:6px;">
     <ul style="margin:0; padding-left:18px; color:#1f2937; font-size:0.95rem; line-height:1.8;">
     <li>DVF does not include construction period or furnished/unfurnished status, limiting exact matching to rent-control categories.</li>
-    <li>Some green-space fields contain missing or placeholder values, including unknown opening years and two records labelled arrondissement 21, which cannot be merged to Paris arrondissements 1–20.</li>
     <li>Planned green spaces are only available at arrondissement level — no street-level spatial join is possible.</li>
     <li>Rent-control values were averaged across room-count categories to obtain a representative zone-level value for mapping.</li>
     </ul>
