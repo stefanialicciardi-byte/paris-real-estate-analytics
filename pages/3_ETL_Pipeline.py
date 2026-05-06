@@ -234,7 +234,7 @@ with col3:
     st.markdown(
         """
         <div style="background:#f8f9fa; border-radius:8px; padding:14px 18px;">
-        <strong>Open issue</strong><br>
+        <strong>Known limitation</strong><br>
         Green-spaces spatial integration pending.
         </div>
         """, unsafe_allow_html=True,
