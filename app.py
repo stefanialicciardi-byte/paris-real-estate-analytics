@@ -1,5 +1,6 @@
 import streamlit as st
 from data_loader import load_dvf, load_rent, load_green, load_planned
+from pathlib import Path
 
 st.set_page_config(
     page_title="Paris Real Estate",
@@ -45,6 +46,7 @@ green-space availability across Paris.**
     """)
 
 with col_right:
+    ASSETS_DIR = Path(__file__).parent.parent / "assets"
     paris_path = ASSETS_DIR / "paris_housing.jpg"
 
     st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
