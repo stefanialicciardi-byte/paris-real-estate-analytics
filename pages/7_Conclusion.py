@@ -52,15 +52,6 @@ st.markdown("---")
 
 st.header("Challenges and solutions looking forward")
 
-
-from pathlib import Path
-import streamlit as st
-
-# -------------------------
-# Page header
-# -------------------------
-st.header("Challenges and solutions looking forward")
-
 # Add spacing under header
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -131,7 +122,7 @@ with r1c2:
 # Add space between rows
 # -------------------------
 st.markdown("<br><br>", unsafe_allow_html=True)
-
+st.markdown("<b>Hello</b>", unsafe_allow_html=True)
 # -------------------------
 # Row 2 - Card
 # -------------------------
