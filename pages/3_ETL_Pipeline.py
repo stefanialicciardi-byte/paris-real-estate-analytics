@@ -223,9 +223,9 @@ with col2:
     st.markdown(
         """
         <div style="background:#f8f9fa; border-radius:8px; padding:14px 18px;">
-        <strong>Tables loaded</strong><br>
+        <strong>Tables loaded</strong><br> 
         DIM_DATE · DIM_LOCATION<br>
-        DIM_ARRONDISSEMENT · DIM_PROPERTY_TYPE<br> DIM_QUARTER
+        DIM_ARRONDISSEMENT · DIM_PROPERTY_TYPE<br> DIM_QUARTER<br> 
         · FACT_TRANSACTION 
         </div>
         """, unsafe_allow_html=True,
