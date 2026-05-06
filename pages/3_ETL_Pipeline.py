@@ -15,8 +15,8 @@ if pipeline_img.exists():
     st.image(str(pipeline_img), use_container_width=True)
 else:
     st.warning("Pipeline overview image not found. Expected: assets/pipeline_overview.png")
-st.markdown("---")
 
+st.markdown("---")
 
 # Pipeline steps
 st.subheader("Pipeline Steps")
@@ -131,10 +131,10 @@ df_transactions.loc[df_transactions['room_count'] > 20,
                     'data_quality_flag'] = 'high_room_count'""", language="python")
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Raw rows (input)", "150,729")
-    col2.metric("After deduplication", "128,685")
-    col3.metric("After aggregation", "73,443")
-    col4.metric("After filtering for 2025", "38,551")
+    col1.metric("Raw rows (input)",          "150,729")
+    col2.metric("After deduplication",       "128,685", delta="-14.6% of raw",  delta_color="off")
+    col3.metric("After aggregation",          "73,443", delta="-51.3% of raw",  delta_color="off")
+    col4.metric("After filtering for 2025",  "38,551",  delta="-74.4% of raw",  delta_color="off")
 
 with tab3:
     st.markdown("### Loading Raw Data into Snowflake")
@@ -218,7 +218,7 @@ LEFT JOIN gs_agg  gs  ON gs.arrondissement_id  = a.arrondissement_id
 LEFT JOIN pgs_agg pgs ON pgs.arrondissement_id = a.arrondissement_id;""", language="sql")
 
     st.markdown("---")
-st.markdown("---")
+
 # Implementation Summary
 st.subheader("Implementation Summary")
 
