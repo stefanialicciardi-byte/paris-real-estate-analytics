@@ -90,8 +90,8 @@ room count, price per m², address, longitude and latitude.
 with col_r:
     st.markdown("""
 **Rent control matching:** Paris is divided into 80 quartiers, each assigned to one of 14
-rent-control zones. Using geographic polygons, each DVF property is matched to its
-rent-control zone via point-in-polygon spatial join.
+rent control zones. Using geographic polygons, each DVF property is matched to its
+rent control zone via point-in-polygon spatial join.
 
 **Green space join:** Planned green spaces are joined by arrondissement. Existing green spaces
 require a spatial join and remain a point for further modelling.
@@ -105,9 +105,8 @@ st.markdown(
     """
     <div style="background:#fff8f0; border-left:5px solid #f59e0b; padding:16px 20px; border-radius:6px;">
     <ul style="margin:0; padding-left:18px; color:#1f2937; font-size:0.95rem; line-height:1.8;">
-    <li>DVF does not include construction period or furnished/unfurnished status, limiting exact matching to rent-control categories.</li>
-    <li>Planned green spaces are only available at arrondissement level — no street-level spatial join is possible.</li>
-    <li>Rent-control values were averaged across room-count categories to obtain a representative zone-level value for mapping.</li>
+    <li>DVF does not include construction period or furnished/unfurnished status, limiting exact matching to rent-control categories. Rent-control values were averaged across room-count categories to obtain a representative zone-level value for mapping.</li>
+    <li>Planned green spaces are only available at arrondissement level, so no street-level spatial join is possible to match directly to a rent control zone.</li>
     </ul>
     </div>
     """,
