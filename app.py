@@ -47,23 +47,25 @@ green-space availability across Paris.**
 
 with col_right:
     ASSETS_DIR = Path(__file__).parent.parent / "assets"
-    paris_path = ASSETS_DIR / "paris_housing.jpg"
+    paris_path = ASSETS_DIR / "paris.png"
 
     st.markdown("<div style='margin-top:20px'></div>", unsafe_allow_html=True)
 
     if paris_path.exists():
         st.image(str(paris_path), use_container_width=True)
     else:
-        st.warning("Image not found. Place paris_housing.jpg in the assets/ folder.")
+        st.warning("Image not found. Place paris.png in the assets/ folder.")
     st.caption("Free image by Andreas Weilguny accessed via Unsplash (2025)")
       
     
 
 st.markdown("---")
 
+# ── Objectives ───────────────────────────────────────────────────────────────────
+
 st.markdown("""
 <div style="background:#f0f4ff; border-left:5px solid #3b6fd4; padding:16px 20px; border-radius:6px;">
-<strong>Project Objective</strong><br><br>
+<strong>Project Objective</strong><br>
 <span style="font-size:0.95rem; color:#1f2937;">
 Lay the technical foundation for monitoring property values and rent-cap data provided
 by the City of Paris, including a robust database schema, an efficient ETL pipeline,
