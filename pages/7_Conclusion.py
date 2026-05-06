@@ -73,7 +73,7 @@ with r1c1:
 
 with r1c2:
     etl_path = ASSETS_DIR / "ETL.png"
-    if schema_path.exists():
+    if etl_path.exists():
         st.image(str(etl_path), use_container_width=True)
     else:
         st.warning("Image not found. Place ETL.png in the assets/ folder.")
