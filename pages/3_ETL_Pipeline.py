@@ -16,7 +16,7 @@ if pipeline_img.exists():
 else:
     st.warning("Pipeline overview image not found. Expected: assets/pipeline_overview.png")
 
-st.markdown("---")
+
 
 # Pipeline steps
 st.subheader("Pipeline Steps")
