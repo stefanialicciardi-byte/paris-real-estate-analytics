@@ -10,7 +10,9 @@ st.title("Data Modeling")
 st.markdown("From Third Normal Form to Star Schema: Design decisions and trade-offs")
 st.markdown("---")
 
+# -------------------------
 #  Core finding 
+# -------------------------
 st.markdown(
     """
     <div style="background:#f0f4ff; border-left:5px solid #3b6fd4; padding:16px 20px; border-radius:6px; margin-bottom:24px;">
@@ -24,120 +26,146 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-#  3NF → Star Schema 
-st.subheader("Step 1: Third Normal Form (3NF)")
-st.markdown("""
-In the first stage, we structured the data into a 3NF model to organise the different source datasets
-in a clear, consistent, and logically separated way. This step helped us:
+# -------------------------
+# Tabs
+# -------------------------
+tab1, tab2, tab3, tab4 = st.tabs([
+    "① Third Normal Form (3NF)",
+    "② Star Schema (Denormalization)",
+    "③ Star Schema Diagram & Table Descriptions",
+    "④ Data Quality Flags"
+])
 
-- Reduce redundancy and preserve the original granularity of each dataset
-- Define the relationships between main entities: property transactions, rent control records,
-  existing green spaces, planned green-space projects, addresses, property types, and geographic areas
-- Understand how the datasets were connected before moving to denormalization
+# -------------------------
+# TAB 1 — 3NF
+# -------------------------
+with tab1:
+    st.subheader("Step 1: Third Normal Form (3NF)")
+    st.markdown("""
+    In the first stage, we structured the data into a 3NF model to organise the different source datasets
+    in a clear, consistent, and logically separated way. This step helped us:
 
-The 3NF model gave us a strong relational foundation (11 tables total) but required complex
-multi-step joins for any analytical query.
-""")
+    - Reduce redundancy and preserve the original granularity of each dataset
+    - Define the relationships between main entities: property transactions, rent control records,
+      existing green spaces, planned green-space projects, addresses, property types, and geographic areas
+    - Understand how the datasets were connected before moving to denormalization
 
-st.subheader("Step 2: Star Schema (Denormalization)")
-st.markdown("""
-We moved from the 3NF model to a Star Schema mainly because it is easier to query and better
-suited for analytical use. The normalized structure would have required chained joins across
-many tables. The Star Schema simplified this by centering the model around **FACT_TRANSACTION**,
-with surrounding dimensions for date, location, arrondissement, property type, and rent-control context.
+    The 3NF model gave us a strong relational foundation (11 tables total) but required complex
+    multi-step joins for any analytical query.
+    """)
 
-**Key benefits:**
-- Simple joins 
-- Faster aggregations in SQL and BI tools
-- More intuitive for the whole team to read and write queries
+# -------------------------
+# TAB 2 — Star Schema
+# -------------------------
+with tab2:
+    st.subheader("Step 2: Star Schema (Denormalization)")
+    st.markdown("""
+    We moved from the 3NF model to a Star Schema mainly because it is easier to query and better
+    suited for analytical use. The normalized structure would have required chained joins across
+    many tables. The Star Schema simplified this by centering the model around **FACT_TRANSACTION**,
+    with surrounding dimensions for date, location, arrondissement, property type, and rent-control context.
 
-**Key trade-off:**
-Green spaces cannot be connected to transactions through a simple key relationship — their
-integration depends on spatial logic (PostGIS / point-in-polygon) and remains a point for
-further modelling. As a pragmatic solution, green-space metrics are aggregated at arrondissement
-level and stored directly in **DIM_ARRONDISSEMENT**.
-""")
+    **Key benefits:**
+    - Simple joins 
+    - Faster aggregations in SQL and BI tools
+    - More intuitive for the whole team to read and write queries
 
-st.markdown("---")
+    **Key trade-off:**
+    Green spaces cannot be connected to transactions through a simple key relationship — their
+    integration depends on spatial logic (PostGIS / point-in-polygon) and remains a point for
+    further modelling. As a pragmatic solution, green-space metrics are aggregated at arrondissement
+    level and stored directly in **DIM_ARRONDISSEMENT**.
+    """)
 
-#  Schema diagram 
-st.subheader("Star Schema Diagram")
-st.caption("Diagram includes an optional spatial layer (dim_green_spaces) for future PostGIS integration")
+# -------------------------
+# TAB 3 — Schema + Tables
+# -------------------------
+with tab3:
+    st.markdown("---")
 
-schema_path = ASSETS_DIR / "star_schema.png"
-if schema_path.exists():
-    st.image(str(schema_path), use_container_width=True)
-else:
-    st.warning("Schema diagram not found. Place star_schema.png in the assets/ folder.")
+    # Schema diagram
+    st.subheader("Star Schema Diagram")
+    st.caption("Diagram includes an optional spatial layer (dim_green_spaces) for future PostGIS integration")
 
-st.markdown("---")
+    schema_path = ASSETS_DIR / "star_schema.png"
+    if schema_path.exists():
+        st.image(str(schema_path), use_container_width=True)
+    else:
+        st.warning("Schema diagram not found. Place star_schema.png in the assets/ folder.")
 
-#  Table descriptions 
-st.subheader("Table Descriptions")
+    st.markdown("---")
 
-col1, col2 = st.columns(2)
+    # Table descriptions
+    st.subheader("Table Descriptions")
 
-with col1:
-    st.markdown(
-        """
-        <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:12px;">
-        <strong>FACT_TRANSACTION</strong> &nbsp;<span style="color:#6b7280; font-size:0.85rem;">38,551 rows</span><br>
-        One row per DVF property transaction. Contains all foreign keys to dimensions plus
-        the core measures: property_value, surface_area, price_per_sqm, room_count,
-        match_score, and data_quality_flag.
-        </div>
+    col1, col2 = st.columns(2)
 
-        <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:12px;">
-        <strong>DIM_DATE</strong><br>
-        One row per unique transaction date. Splits the date into year, month, quarter,
-        week, day, day_of_week, day_name, and is_weekend for time-based filtering.
-        </div>
+    with col1:
+        st.markdown(
+            """
+            <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:12px;">
+            <strong>FACT_TRANSACTION</strong> &nbsp;<span style="color:#6b7280; font-size:0.85rem;">38,551 rows</span><br>
+            One row per DVF property transaction. Contains all foreign keys to dimensions plus
+            the core measures: property_value, surface_area, price_per_sqm, room_count,
+            match_score, and data_quality_flag.
+            </div>
 
-        <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px;">
-        <strong>DIM_LOCATION</strong><br>
-        One row per unique street. Contains street code, name, type, postal code,
-        full address, latitude, longitude, and geocoding metadata.
-        Originally named DIM_STREET — renamed because it contains more than street info.
-        </div>
-        """, unsafe_allow_html=True,
-    )
+            <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:12px;">
+            <strong>DIM_DATE</strong><br>
+            One row per unique transaction date. Splits the date into year, month, quarter,
+            week, day, day_of_week, day_name, and is_weekend for time-based filtering.
+            </div>
 
-with col2:
-    st.markdown(
-        """
-        <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:12px;">
-        <strong>DIM_ARRONDISSEMENT</strong><br>
-        One row per arrondissement. Acts as the analytical spine connecting all four
-        source datasets. Stores aggregated green-space metrics (count, total area, planned
-        projects) to avoid a spatial join at query time.
-        </div>
+            <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px;">
+            <strong>DIM_LOCATION</strong><br>
+            One row per unique street. Contains street code, name, type, postal code,
+            full address, latitude, longitude, and geocoding metadata.
+            Originally named DIM_STREET — renamed because it contains more than street info.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-        <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:12px;">
-        <strong>DIM_QUARTER</strong><br>
-        One row per rent-control quartier. Contains zone_id, quarter_name, and the
-        aggregated rent thresholds: avg_reference_rent, rent_band_min, rent_band_max.
-        </div>
+    with col2:
+        st.markdown(
+            """
+            <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:12px;">
+            <strong>DIM_ARRONDISSEMENT</strong><br>
+            One row per arrondissement. Acts as the analytical spine connecting all four
+            source datasets. Stores aggregated green-space metrics (count, total area, planned
+            projects) to avoid a spatial join at query time.
+            </div>
 
-        <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px;">
-        <strong>DIM_PROPERTY_TYPE</strong><br>
-        Small lookup table for the four property types in DVF: Apartment, House,
-        Industrial/Commercial, and Outbuilding.
-        </div>
-        """, unsafe_allow_html=True,
-    )
+            <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin-bottom:12px;">
+            <strong>DIM_QUARTER</strong><br>
+            One row per rent-control quartier. Contains zone_id, quarter_name, and the
+            aggregated rent thresholds: avg_reference_rent, rent_band_min, rent_band_max.
+            </div>
 
-st.markdown("---")
+            <div style="border:1px solid #e5e7eb; border-radius:8px; padding:16px;">
+            <strong>DIM_PROPERTY_TYPE</strong><br>
+            Small lookup table for the four property types in DVF: Apartment, House,
+            Industrial/Commercial, and Outbuilding.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-#  Data quality flags 
-st.subheader("Data Quality Flags")
-st.markdown("""
-A `data_quality_flag` column in FACT_TRANSACTION marks suspicious records.
-These rows are **not deleted** and remain available for inspection, while
-clean analyses filter to `flag = 'ok'`.
-""")
+# -------------------------
+# TAB 4 — Data Quality
+# -------------------------
+with tab4:
+    st.markdown("---")
 
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("ok (clean)", "37,720", "97.8%")
-col2.metric("price_per_sqm_high", "537", "Likely institutional")
-col3.metric("surface_too_small", "196", "< 9 m²: likely parking")
-col4.metric("high_room_count", "98", "> 20 rooms: likely building")
+    st.subheader("Data Quality Flags")
+    st.markdown("""
+    A `data_quality_flag` column in FACT_TRANSACTION marks suspicious records.
+    These rows are **not deleted** and remain available for inspection, while
+    clean analyses filter to `flag = 'ok'`.
+    """)
+
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("ok (clean)", "37,720", "97.8%")
+    col2.metric("price_per_sqm_high", "537", "Likely institutional")
+    col3.metric("surface_too_small", "196", "< 9 m²: likely parking")
+    col4.metric("high_room_count", "98", "> 20 rooms: likely building")
