@@ -185,7 +185,7 @@ with tab4:
 The dimensions are loaded first, then `FACT_TRANSACTION` with FK lookups.
     """)
 
-    with st.expander("Show code — DIM_ARRONDISSEMENT example"):
+    with st.expander("Show code: DIM_ARRONDISSEMENT example"):
         st.code("""-- DIM_ARRONDISSEMENT: aggregate green space metrics on the fly
 INSERT INTO PARIS_REALESTATE.STAR.DIM_ARRONDISSEMENT (
     arrondissement_id, arrondissement_number, arrondissement_name,
