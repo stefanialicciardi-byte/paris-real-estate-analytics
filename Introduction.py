@@ -103,4 +103,145 @@ with q2:
 
 
 st.markdown("---")
+
+# ── Table of Contents ─────────────────────────────────────────────
+st.header("Project Contents")
+
+# Row 1
+col1, col2 = st.columns(2)
+
+with col1:
+    st.markdown(
+        """
+        <div style="
+            border:1px solid #e5e7eb;
+            border-radius:10px;
+            padding:22px;
+            margin-bottom:20px;
+            line-height:1.6;
+            background-color:#F2F2F7;
+        ">
+        <strong style="font-size:1.05rem;">① Introduction</strong><br>
+
+        <div style="color:#6b7280; font-size:0.95rem; margin-top:12px;">
+        Overview of the Paris housing context, project objectives, and key research questions explored in the analysis.
+        </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with col2:
+    st.markdown(
+        """
+        <div style="
+            border:1px solid #e5e7eb;
+            border-radius:10px;
+            padding:22px;
+            margin-bottom:20px;
+            line-height:1.6;
+            background-color:#F2F2F7;
+        ">
+        <strong style="font-size:1.05rem;">② Data Sources</strong><br>
+
+        <div style="color:#6b7280; font-size:0.95rem; margin-top:12px;">
+        Presentation of the open datasets used, including DVF transactions, rent-control zones, and green-space datasets.
+        </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# Row 2
+col3, col4 = st.columns(2)
+
+with col3:
+    st.markdown(
+        """
+        <div style="
+            border:1px solid #e5e7eb;
+            border-radius:10px;
+            padding:22px;
+            margin-bottom:20px;
+            line-height:1.6;
+            background-color:#F2F2F7;
+        ">
+        <strong style="font-size:1.05rem;">③ Data Modeling</strong><br>
+
+        <div style="color:#6b7280; font-size:0.95rem; margin-top:12px;">
+        Explanation of the transition from a normalized 3NF schema to an analytical Star Schema model.
+        </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with col4:
+    st.markdown(
+        """
+        <div style="
+            border:1px solid #e5e7eb;
+            border-radius:10px;
+            padding:22px;
+            margin-bottom:20px;
+            line-height:1.6;
+            background-color:#F2F2F7;
+        ">
+        <strong style="font-size:1.05rem;">④ ETL Pipeline</strong><br>
+
+        <div style="color:#6b7280; font-size:0.95rem; margin-top:12px;">
+        Description of the extraction, transformation, cleaning, geocoding, and loading workflow used to prepare the datasets.
+        </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+# Row 3
+col5, col6 = st.columns(2)
+
+with col5:
+    st.markdown(
+        """
+        <div style="
+            border:1px solid #e5e7eb;
+            border-radius:10px;
+            padding:22px;
+            margin-bottom:20px;
+            line-height:1.6;
+            background-color:#F2F2F7;
+        ">
+        <strong style="font-size:1.05rem;">⑤ Analysis</strong><br>
+
+        <div style="color:#6b7280; font-size:0.95rem; margin-top:12px;">
+        Interactive analysis pages exploring rent control, green spaces, and integrated geospatial visualisations of Paris.
+        </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+with col6:
+    st.markdown(
+        """
+        <div style="
+            border:1px solid #e5e7eb;
+            border-radius:10px;
+            padding:22px;
+            margin-bottom:20px;
+            line-height:1.6;
+            background-color:#F2F2F7;
+        ">
+        <strong style="font-size:1.05rem;">⑥ Conclusion</strong><br>
+
+        <div style="color:#6b7280; font-size:0.95rem; margin-top:12px;">
+        Final discussion of the project's findings, limitations, technical challenges, and future improvements.
+        </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+st.markdown("---")
 st.caption("Paris Real Estate • Stefania Licciardi • Victoria Ford • Andrés Lill • May 2026")
