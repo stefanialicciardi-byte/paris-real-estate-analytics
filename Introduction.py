@@ -114,12 +114,12 @@ with col1:
     st.markdown(
         """
         <div style="
-            border:1px solid #f8f9fa;
+            border:1px solid #f0f4ff;
             border-radius:10px;
             padding:22px;
             margin-bottom:20px;
             line-height:1.6;
-            background-color:#f8f9fa;
+            background-color:#f0f4ff;
         ">
         <strong style="font-size:1.05rem;">① Introduction</strong><br>
 
