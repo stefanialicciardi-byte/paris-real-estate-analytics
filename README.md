@@ -18,13 +18,31 @@ The datasets cover property transactions (DVF 2025), rent control thresholds (en
 
 ## Dashboard Pages
 
-**Home**: Project context, research questions, and live KPIs  
+**Home**: Project context, research questions, and live KPIs 
 **Data Sources**: Four datasets, scope decisions, and limitations  
 **Data Modeling**: From 3NF to Star Schema, ER diagram, and design decisions  
 **ETL Pipeline**: Extraction, transformation, Snowflake loading, and SQL populate scripts  
-**Analysis**: Interactive Folium map of sale prices, rent control zones, and green spaces  
+**Analysis**: Interactive Folium map of sale prices, rent control zones, and green spaces
+
 
 ---
+
+
+## Dashboard Preview
+
+### Home Page
+
+![Home Page](assets/screenshots/home.png)
+
+### Analysis Dashboard
+
+![Analysis Map](assets/screenshots/analysis_map.png)
+
+### ETL Pipeline
+
+![ETL Pipeline](assets/screenshots/etl_pipeline.png)
+
+----
 
 ## Folder Structure
 
