@@ -40,7 +40,7 @@ The datasets cover property transactions (DVF 2025), rent control thresholds (en
 
 ### ETL Pipeline
 
-![ETL Pipeline](assets/screenshots/ETL pipeline.png)
+![ETL Pipeline](assets/screenshots/ETL_pipeline.png)
 
 ----
 
