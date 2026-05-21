@@ -46,7 +46,7 @@ Interactive geospatial dashboard combining property transactions, rent control z
 
 Star schema design and analytical data modeling used to structure the Paris real estate datasets in Snowflake.
 
-![Data Modeling](assets/Data_modeling.png)
+![Data Modeling](assets/screenshots/Data_modeling.png)
 
 
 ### ETL Pipeline
