@@ -40,7 +40,7 @@ Project introduction and business context for the Paris real estate analytics st
 
 Interactive geospatial dashboard combining property transactions, rent control zones, and urban green spaces across Paris.
 
-![Analysis Map](assets/screenshots/analysys_map.png)
+![Analysis Map](assets/screenshots/Integrated_map.gif)
 
 ### Data Modeling
 
