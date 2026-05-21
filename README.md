@@ -32,13 +32,26 @@ The datasets cover property transactions (DVF 2025), rent control thresholds (en
 
 ### Home Page
 
+Project introduction and business context for the Paris real estate analytics study.
+
 ![Home Page](assets/screenshots/Home.png)
 
 ### Analysis Dashboard
 
+Interactive geospatial dashboard combining property transactions, rent control zones, and urban green spaces across Paris.
+
 ![Analysis Map](assets/screenshots/analysys_map.png)
 
+### Data Modeling
+
+Star schema design and analytical data modeling used to structure the Paris real estate datasets in Snowflake.
+
+![Data Modeling](assets/Data_modeling.png)
+
+
 ### ETL Pipeline
+
+Overview of the end-to-end analytics engineering workflow from raw datasets to the final analytical model in Snowflake.
 
 ![ETL Pipeline](assets/screenshots/ETL_pipeline.png)
 
