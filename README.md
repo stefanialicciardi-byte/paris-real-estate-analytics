@@ -16,6 +16,14 @@ The datasets cover property transactions (DVF 2025), rent control thresholds (en
 
 ---
 
+## Key Insights
+
+- Central Paris districts combine the highest property prices with elevated rent control thresholds.
+- High-value areas tend to show lower transaction volumes, suggesting stronger ownership retention.
+- Urban green space availability does not necessarily correlate with premium property prices.
+
+---
+
 ## Dashboard Pages
 
 **Home**: Project context, research questions, and live KPIs 
