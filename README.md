@@ -2,7 +2,7 @@
 
 Analytics Engineering project analysing property values, rent control zones, and urban green spaces in Paris.
 
-**Live dashboard:** https://paris-real-estate-analytics.streamlit.app/
+**Live dashboard:** https://paris-real-estate-analytics-i.streamlit.app/
 
 **Team:** Stefania Licciardi, Victoria Ford, Andrés Lill
 
